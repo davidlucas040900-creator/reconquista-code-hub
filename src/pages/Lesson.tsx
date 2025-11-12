@@ -10,14 +10,14 @@ import 'plyr-react/plyr.css';
 const Lesson = () => {
   const { moduleSlug, lessonId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { user, loading } = useAuth();
   const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
+    if (!loading && !user) {
+      navigate('/');
     }
-  }, [isAuthenticated, navigate]);
+  }, [user, loading, navigate]);
 
   const module = modules.find(m => m.slug === moduleSlug);
   const lesson = module?.lessons.find(l => l.id === Number(lessonId));

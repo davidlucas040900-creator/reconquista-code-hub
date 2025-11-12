@@ -5,34 +5,48 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { signIn, signUp, user } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (user) {
       navigate('/dashboard');
     }
-  }, [isAuthenticated, navigate]);
+  }, [user, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate network delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const success = login(username, password);
+    const { error } = await signIn(email, password);
     
-    if (success) {
+    if (!error) {
       toast.success('Bem-vinda de volta! 🎉');
       navigate('/dashboard');
     } else {
-      toast.error('Credenciais inválidas. Tenta novamente.');
+      toast.error('Credenciais inválidas. Verifica o teu e-mail e palavra-passe.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const { error } = await signUp(email, password, fullName);
+    
+    if (!error) {
+      toast.success('Conta criada com sucesso! Bem-vinda! 🎉');
+      navigate('/dashboard');
+    } else {
+      toast.error(error.message || 'Erro ao criar conta. Tenta novamente.');
       setIsLoading(false);
     }
   };
@@ -64,51 +78,118 @@ const Login = () => {
             Inicia a tua jornada de reconquista
           </p>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-foreground">
-                Nome de Usuário
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="aluna_codigo"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
-              />
-            </div>
+          {/* Tabs for Login/Signup */}
+          <Tabs defaultValue="signin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="signin">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            </TabsList>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">
-                Palavra-passe
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Reconquista@2024"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
-              />
-            </div>
+            <TabsContent value="signin">
+              <form onSubmit={handleSignIn} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="email-signin" className="text-foreground">
+                    E-mail
+                  </Label>
+                  <Input
+                    id="email-signin"
+                    type="email"
+                    placeholder="teu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
+                  />
+                </div>
 
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold text-lg py-6 rounded-xl shadow-lg hover:shadow-red transition-all hover:scale-[1.02]"
-            >
-              {isLoading ? 'A entrar...' : 'ENTRAR NA JORNADA'}
-            </Button>
-          </form>
+                <div className="space-y-2">
+                  <Label htmlFor="password-signin" className="text-foreground">
+                    Palavra-passe
+                  </Label>
+                  <Input
+                    id="password-signin"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold text-lg py-6 rounded-xl shadow-lg hover:shadow-red transition-all hover:scale-[1.02]"
+                >
+                  {isLoading ? 'A entrar...' : 'ENTRAR NA JORNADA'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="fullname" className="text-foreground">
+                    Nome Completo
+                  </Label>
+                  <Input
+                    id="fullname"
+                    type="text"
+                    placeholder="O teu nome"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email-signup" className="text-foreground">
+                    E-mail
+                  </Label>
+                  <Input
+                    id="email-signup"
+                    type="email"
+                    placeholder="teu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password-signup" className="text-foreground">
+                    Palavra-passe
+                  </Label>
+                  <Input
+                    id="password-signup"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold text-lg py-6 rounded-xl shadow-lg hover:shadow-red transition-all hover:scale-[1.02]"
+                >
+                  {isLoading ? 'A criar conta...' : 'COMEÇAR A JORNADA'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
 
           {/* Footer hint */}
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              💡 Dica: As tuas credenciais foram enviadas por e-mail
+              💡 Cria a tua conta para aceder a todos os módulos do curso
             </p>
           </div>
         </div>

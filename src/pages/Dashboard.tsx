@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { modules } from '@/data/modules';
@@ -6,24 +6,50 @@ import { ModuleCard } from '@/components/ModuleCard';
 import { Button } from '@/components/ui/button';
 import { LogOut, Award, TrendingUp, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
-  const { isAuthenticated, userName, logout } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
+    if (!loading && !user) {
+      navigate('/');
     }
-  }, [isAuthenticated, navigate]);
+  }, [user, loading, navigate]);
 
-  const handleLogout = () => {
-    logout();
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        setProfile(data);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
+  const handleLogout = async () => {
+    await signOut();
     toast.success('Até breve! 👋');
-    navigate('/login');
+    navigate('/');
   };
 
-  if (!isAuthenticated) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-foreground">A carregar...</div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,7 +89,7 @@ const Dashboard = () => {
               />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Bem-vinda à tua virada de jogo, <span className="text-gradient-gold">{userName}</span>!
+              Bem-vinda à tua virada de jogo, <span className="text-gradient-gold">{profile?.full_name || user?.email?.split('@')[0] || 'Aluna'}</span>!
             </h1>
             <p className="text-lg text-muted-foreground mb-6">
               Estás pronta para dominar a arte da reconquista? A tua jornada começa agora.
