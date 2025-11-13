@@ -9,7 +9,7 @@ import { WeeklyChallengeCard } from '@/components/WeeklyChallengeCard';
 import { UpsellCarousel } from '@/components/UpsellCarousel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
-import { LogOut, Award, TrendingUp, Lock, User } from 'lucide-react';
+import { LogOut, Award, TrendingUp, Lock, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -84,6 +84,15 @@ const Dashboard = () => {
 
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/comunidade')}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Comunidade</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

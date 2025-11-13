@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { modules } from '@/data/modules';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Home, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { MarkAsCompletedButton } from '@/components/MarkAsCompletedButton';
+import { MaterialsSection } from '@/components/MaterialsSection';
 import Plyr from 'plyr-react';
 import 'plyr-react/plyr.css';
 
@@ -129,6 +131,14 @@ const Lesson = () => {
               </div>
             </div>
 
+            {/* Mark as Completed Button */}
+            <div className="bg-card rounded-xl p-6 border border-border">
+              <MarkAsCompletedButton moduleId={module.id} lessonId={lesson.id} />
+            </div>
+
+            {/* Materials Section */}
+            <MaterialsSection />
+
             {/* Next Steps Card */}
             <div className="bg-gradient-to-br from-primary/10 to-background rounded-xl p-6 border border-primary/30">
               <h3 className="font-bold text-lg text-foreground mb-3 flex items-center gap-2">
@@ -162,12 +172,20 @@ const Lesson = () => {
                 Ver Todos os Módulos
               </Button>
 
-              {!isLastLesson && nextLesson && (
+              {nextLesson ? (
                 <Button
-                  onClick={() => navigate(`/modulo/${moduleSlug}/aula/${nextLesson.id}`)}
+                  onClick={() => navigate(`/${moduleSlug}/${nextLesson.id}`)}
                   className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   Próxima Aula
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => navigate('/dashboard')}
+                  className="gap-2 bg-green-500 hover:bg-green-600 text-white"
+                >
+                  Módulo Concluído! Ver Próximo
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               )}
