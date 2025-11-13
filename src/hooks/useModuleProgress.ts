@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Database } from '@/integrations/supabase/types';
 
-interface LessonProgress {
-  module_id: number;
-  lesson_id: number;
-  completed: boolean;
-}
+type LessonProgress = Database['public']['Tables']['module_progress']['Row'];
 
 export const useModuleProgress = () => {
   const { user } = useAuth();
@@ -22,12 +19,12 @@ export const useModuleProgress = () => {
 
     const fetchProgress = async () => {
       const { data, error } = await supabase
-        .from('user_lessons')
-        .select('module_id, lesson_id, completed')
-        .eq('user_id', user.id) as any;
+        .from('module_progress')
+        .select('*')
+        .eq('user_id', user.id);
 
       if (!error && data) {
-        setProgress(data as LessonProgress[]);
+        setProgress(data);
       }
       setLoading(false);
     };
@@ -39,21 +36,30 @@ export const useModuleProgress = () => {
     if (!user) return;
 
     const { error } = await supabase
-      .from('user_lessons')
+      .from('module_progress')
       .upsert({
         user_id: user.id,
         module_id: moduleId,
         lesson_id: lessonId,
         completed: true,
         completed_at: new Date().toISOString(),
-      } as any, {
+      }, {
         onConflict: 'user_id,module_id,lesson_id'
       });
 
     if (!error) {
       setProgress(prev => [
         ...prev.filter(p => !(p.module_id === moduleId && p.lesson_id === lessonId)),
-        { module_id: moduleId, lesson_id: lessonId, completed: true }
+        { 
+          user_id: user.id,
+          module_id: moduleId, 
+          lesson_id: lessonId, 
+          completed: true,
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          id: crypto.randomUUID()
+        }
       ]);
     }
   };
