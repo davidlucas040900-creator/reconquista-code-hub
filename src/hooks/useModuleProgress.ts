@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Database } from '@/integrations/supabase/types';
 
-type LessonProgress = Database['public']['Tables']['module_progress']['Row'];
+interface LessonProgress {
+  id: string;
+  user_id: string;
+  module_number: number;
+  lesson_number: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export const useModuleProgress = () => {
   const { user } = useAuth();
@@ -18,13 +26,13 @@ export const useModuleProgress = () => {
     }
 
     const fetchProgress = async () => {
-      const { data, error } = await supabase
-        .from('module_progress')
+      const { data, error } = await (supabase as any)
+        .from('user_lessons')
         .select('*')
         .eq('user_id', user.id);
 
       if (!error && data) {
-        setProgress(data);
+        setProgress(data as LessonProgress[]);
       }
       setLoading(false);
     };
@@ -35,26 +43,26 @@ export const useModuleProgress = () => {
   const markLessonComplete = async (moduleId: number, lessonId: number) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from('module_progress')
+    const { error } = await (supabase as any)
+      .from('user_lessons')
       .upsert({
         user_id: user.id,
-        module_id: moduleId,
-        lesson_id: lessonId,
-        completed: true,
+        module_number: moduleId,
+        lesson_number: lessonId,
+        is_completed: true,
         completed_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id,module_id,lesson_id'
+        onConflict: 'user_id,module_number,lesson_number'
       });
 
     if (!error) {
       setProgress(prev => [
-        ...prev.filter(p => !(p.module_id === moduleId && p.lesson_id === lessonId)),
+        ...prev.filter(p => !(p.module_number === moduleId && p.lesson_number === lessonId)),
         { 
           user_id: user.id,
-          module_id: moduleId, 
-          lesson_id: lessonId, 
-          completed: true,
+          module_number: moduleId, 
+          lesson_number: lessonId, 
+          is_completed: true,
           completed_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -66,13 +74,13 @@ export const useModuleProgress = () => {
 
   const isLessonCompleted = (moduleId: number, lessonId: number) => {
     return progress.some(
-      p => p.module_id === moduleId && p.lesson_id === lessonId && p.completed
+      p => p.module_number === moduleId && p.lesson_number === lessonId && p.is_completed
     );
   };
 
   const getModuleProgress = (moduleId: number, totalLessons: number) => {
     const completedLessons = progress.filter(
-      p => p.module_id === moduleId && p.completed
+      p => p.module_number === moduleId && p.is_completed
     ).length;
     return totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
   };
