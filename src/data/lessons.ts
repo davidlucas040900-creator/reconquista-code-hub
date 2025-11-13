@@ -7,43 +7,54 @@ export interface LessonData {
 }
 
 export const lessonsData: LessonData[] = [
-  // Módulo 1
+  // Módulo 1 - Reset Emocional
   { module: 1, lesson: 1, title: "Suma que ELE VEM ATRÁS!", videoId: "c1CQZVK5lhc", description: "Descubra por que a ausência estratégica é a chave para fazê-lo voltar." },
   { module: 1, lesson: 2, title: "NÃO TENHA MEDO de sumir e ELE TE ESQUECER!", videoId: "S7_4EebCUcM", description: "Aprenda a aplicar o distanciamento sem medo de perdê-lo." },
   { module: 1, lesson: 3, title: "Os HOMENS SEMPRE VOLTAM Como assim!!", videoId: "fsCvIC_FYRM", description: "Entenda a psicologia por trás do retorno masculino." },
   { module: 1, lesson: 4, title: "HOMEM precisa de AUSÊNCIA e TEMPO para CORRER ATRÁS", videoId: "wPFir0N4HoU", description: "O timing perfeito para aplicar a ausência estratégica." },
+  { module: 1, lesson: 5, title: "Por que quando a MULHER SOME O HOMEM VAI ATRÁS?", videoId: "w3gApW6MI3M", description: "Bónus: Entenda a psicologia por trás do movimento de ausência." },
+  { module: 1, lesson: 6, title: "Por que NÃO IR ATRÁS é a melhor escolha?", videoId: "ODhg0ND4DYc", description: "Bónus: Descubra porque resistir é a estratégia vencedora." },
+  { module: 1, lesson: 7, title: "Não entre em DESESPERO! Senão você PERDE!", videoId: "jGjdF7U14EY", description: "Bónus: Como manter o controle emocional em momentos críticos." },
 
-  // Módulo 2
+  // Módulo 2 - Mapa da Mente Masculina
   { module: 2, lesson: 1, title: "OS 5 PRINCÍPIOS DA MENTE MASCULINA!", videoId: "Kvmh9RUIfFc", description: "Domine os 5 pilares da psicologia masculina." },
   { module: 2, lesson: 2, title: "COMO CONTROLAR A MENTE DE UM HOMEM?", videoId: "-pfXXwkNWTk", description: "Aprenda os mecanismos psicológicos que regem decisões masculinas." },
   { module: 2, lesson: 3, title: "O que o SILÊNCIO faz na CABEÇA de um HOMEM?", videoId: "v_d7mmtVh0c", description: "O poder do silêncio estratégico na reconquista." },
   { module: 2, lesson: 4, title: "CABEÇA DO HOMEM no PÓS TÉRMINO", videoId: "knKjXRx0iag", description: "Como ele pensa e sente após o término." },
+  { module: 2, lesson: 5, title: "OS HOMENS SÃO PREVISÍVEIS!! ATENÇÃO MULHERES!!", videoId: "eDMlDbXrBUA", description: "Bónus: Descubra os padrões comportamentais masculinos." },
+  { module: 2, lesson: 6, title: "HOMEM GOSTA DE SER PISADO E DESPREZADO?", videoId: "DbMmYHv1xkk", description: "Bónus: A verdade sobre valorização e desprezo." },
+  { module: 2, lesson: 7, title: "LINHA MASCULINA do tempo no PÓS TÉRMINO?", videoId: "nz3IEPR7euo", description: "Bónus: A cronologia emocional masculina após o fim." },
 
-  // Módulo 3
+  // Módulo 3 - Gatilhos da Memória Emocional
   { module: 3, lesson: 1, title: "Como deixar um HOMEM COM MEDO DE PERDER!", videoId: "Itat8QDkhhQ", description: "Ative o gatilho do medo da perda." },
   { module: 3, lesson: 2, title: "APRENDA A REJEITAR PRA ELE VIR ATRAS!", videoId: "5LMJop82nBk", description: "A arte de rejeitar estrategicamente." },
   { module: 3, lesson: 3, title: "Postura que faz HOMEM QUERER FEITO DOIDO", videoId: "8KD93jjgbBg", description: "A postura que desperta desejo irresistível." },
+  { module: 3, lesson: 4, title: "EU QUERO QUE ELE VOLTE RASTEJAAAANNNDO!", videoId: "TAgC5VAg2_o", description: "Bónus: Como fazê-lo implorar pela sua atenção." },
 
-  // Módulo 4
+  // Módulo 4 - A Frase de 5 Palavras
   { module: 4, lesson: 1, title: "3 Frases Pra Mexer PROFUNDAMENTE com o Psicológico de um Homem!", videoId: "hjVBIwEWO7o", description: "As 3 frases secretas que ativam memória emocional." },
   { module: 4, lesson: 2, title: "A Mensagem que Reconquista ELE Sumiu Diga isso!", videoId: "tu2NxuqrbK4", description: "A mensagem exata para quando ele desaparece." },
   { module: 4, lesson: 3, title: "ELE SUMIU! Devo MANDAR um 'Oi'?", videoId: "hRYhIoNhJqs", description: "Como reagir quando ele some." },
 
-  // Módulo 5
+  // Módulo 5 - Primeiro Contato Estratégico
   { module: 5, lesson: 1, title: "O EX APARECEU FAÇA CERTO DESSA VEZ!", videoId: "-6YSO7AYrZI", description: "O que dizer e fazer quando ele te procura." },
   { module: 5, lesson: 2, title: "Como se comportar ao se ENCONTRAR com EX?", videoId: "sklhMr24Fg4", description: "Guia completo de postura e linguagem corporal." },
   { module: 5, lesson: 3, title: "Ele enviou 'SAUDADES'!!! O QUE RESPONDER?", videoId: "h5gUHiS-q7k", description: "A resposta perfeita para reconquistar." },
 
-  // Módulo 6
+  // Módulo 6 - Domínio da Conversa
   { module: 6, lesson: 1, title: "WHATSAPP SEJA DIRETA AO FALAR COM HOMEM!", videoId: "jkBEYleb4ZM", description: "Domine a comunicação por mensagem." },
   { module: 6, lesson: 2, title: "WhatsApp; Mensagem MEDÍOCRE NÃO se RESPONDE!!", videoId: "MYPGCmLJFKw", description: "Como identificar e lidar com mensagens rasas." },
   { module: 6, lesson: 3, title: "VOCÊ sabe se COMUNICAR com um HOMEM?", videoId: "eSgYJD9OVSU", description: "A arte da comunicação eficaz." },
+  { module: 6, lesson: 4, title: "O que falar no WHATS após um Gelo? Parte 1", videoId: "QDFILn1Z-n0", description: "Bónus: Estratégias para quebrar o gelo - Parte 1." },
+  { module: 6, lesson: 5, title: "O que falar no SAPP após Gelo? Parte 2", videoId: "UL6eqQ3yGFA", description: "Bónus: Estratégias para quebrar o gelo - Parte 2." },
 
-  // Módulo 7
+  // Módulo 7 - Conquista Duradoura
   { module: 7, lesson: 1, title: "POR QUE NENHUM RELACIONAMENTO MEU VAI PRA FRENTE", videoId: "kSf3mrsW5XA", description: "Identifique padrões sabotadores." },
   { module: 7, lesson: 2, title: "Como VIRAR O JOGO no seu RELACIONAMENTO?", videoId: "4p3u7AaOsDg", description: "Estratégias para transformar sua relação." },
   { module: 7, lesson: 3, title: "Como prender um homem? TÉCNICA INFALÍVEL!", videoId: "NXDmCor9bUY", description: "A técnica definitiva para mantê-lo apaixonado." },
   { module: 7, lesson: 4, title: "COMO MANTER O HOMEM INTERESSADO?", videoId: "zbwv5QuANd8", description: "Mantenha a chama acesa para sempre." },
+  { module: 7, lesson: 5, title: "NÃO ACEITE qualquer coisa de um HOMEM!!", videoId: "s4SzR3LStMc", description: "Bónus: Estabeleça padrões elevados e mantenha-os." },
+  { module: 7, lesson: 6, title: "NÃO DÊ O SEU PODER A UM HOMEM!", videoId: "koNd0YLIYkQ", description: "Bónus: Mantenha o seu poder pessoal sempre." },
 ];
 
 export const getLessonData = (moduleNumber: number, lessonNumber: number): LessonData | undefined => {
