@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { modules } from '@/data/modules';
 import { ModuleCard } from '@/components/ModuleCard';
+import { JourneyMap } from '@/components/JourneyMap';
+import { useUserModules } from '@/hooks/useUserModules';
 import { Button } from '@/components/ui/button';
 import { LogOut, Award, TrendingUp, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +14,7 @@ const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
+  const { modules: userModules, loading: modulesLoading } = useUserModules();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,13 +38,25 @@ const Dashboard = () => {
     fetchProfile();
   }, [user]);
 
+  const handleModuleClick = (moduleSlug: string, moduleNumber: number) => {
+    const userModule = userModules.find(m => m.module_number === moduleNumber);
+    
+    if (!userModule?.is_released) {
+      const releaseDate = new Date(userModule?.release_date || '');
+      toast.error(`Este módulo será liberado em ${releaseDate.toLocaleDateString('pt-PT')}`);
+      return;
+    }
+    
+    navigate(`/${moduleSlug}/aula-1`);
+  };
+
   const handleLogout = async () => {
     await signOut();
     toast.success('Até breve! 👋');
     navigate('/');
   };
 
-  if (loading) {
+  if (loading || modulesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-foreground">A carregar...</div>

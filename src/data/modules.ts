@@ -186,49 +186,5 @@ export const modules: Module[] = [
     ],
     progress: 0,
     badge: null
-  },
-  {
-    id: 8,
-    title: "Comunicação Irresistível",
-    slug: "comunicacao-irresistivel",
-    description: "Frases que despertam desejo. O que falar para fazer ele sentir tua falta e te procurar obsessivamente.",
-    thumbnail: "https://pub-335435355c6548d7987945a540eca66b.r2.dev/MODULO%207.webp",
-    duration: "45 min",
-    lessons: [],
-    progress: 0,
-    badge: null
-  },
-  {
-    id: 9,
-    title: "Psicologia da Reconquista",
-    slug: "psicologia-reconquista",
-    description: "Entende a mente masculina profundamente. Como usar gatilhos psicológicos para reconquistar com ciência.",
-    thumbnail: "https://pub-335435355c6548d7987945a540eca66b.r2.dev/MODULO%206.webp",
-    duration: "62 min",
-    lessons: [],
-    progress: 0,
-    badge: null
-  },
-  {
-    id: 10,
-    title: "Autoconfiança Feminina",
-    slug: "autoconfianca-feminina",
-    description: "Como ser uma mulher de alto valor. Aumenta tua autoconfiança e torna-te irresistível aos olhos dele.",
-    thumbnail: "https://pub-335435355c6548d7987945a540eca66b.r2.dev/MODULO%205.webp",
-    duration: "50 min",
-    lessons: [],
-    progress: 0,
-    badge: null
-  },
-  {
-    id: 11,
-    title: "Sedução Sutil",
-    slug: "seducao-sutil",
-    description: "Como seduzir um homem com mensagens e atitudes. Dicas práticas para reconquistar sem parecer óbvia.",
-    thumbnail: "https://pub-335435355c6548d7987945a540eca66b.r2.dev/MODULO%204.webp",
-    duration: "46 min",
-    lessons: [],
-    progress: 0,
-    badge: null
   }
 ];

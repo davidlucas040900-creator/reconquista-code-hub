@@ -11,6 +11,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
@@ -40,11 +41,14 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signUp(email, password, fullName);
+    // Fixed password for all signups
+    const fixedPassword = "Reconquista@2026";
+    
+    const { error } = await signUp(email, fixedPassword, fullName, whatsapp);
     
     if (!error) {
-      toast.success('Conta criada com sucesso! Bem-vinda! 🎉');
-      navigate('/dashboard');
+      toast.success('Conta criada! Agora faça login com seu e-mail e a senha Reconquista@2026');
+      navigate('/login');
     } else {
       toast.error(error.message || 'Erro ao criar conta. Tenta novamente.');
       setIsLoading(false);
@@ -160,19 +164,24 @@ const Login = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password-signup" className="text-foreground">
-                    Palavra-passe
+                  <Label htmlFor="whatsapp-signup" className="text-foreground">
+                    Número de WhatsApp
                   </Label>
                   <Input
-                    id="password-signup"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    id="whatsapp-signup"
+                    type="tel"
+                    placeholder="+258..."
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
                     required
-                    minLength={6}
                     className="bg-background/50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary transition-all"
                   />
+                </div>
+
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground text-center">
+                    A senha inicial será: <span className="font-semibold text-foreground">Reconquista@2026</span>
+                  </p>
                 </div>
 
                 <Button

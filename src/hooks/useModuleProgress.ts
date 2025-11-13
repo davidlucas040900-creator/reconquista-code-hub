@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface ModuleProgress {
+interface LessonProgress {
   module_id: number;
   lesson_id: number;
+  lesson_number: number;
   completed: boolean;
 }
 
 export const useModuleProgress = () => {
   const { user } = useAuth();
-  const [progress, setProgress] = useState<ModuleProgress[]>([]);
+  const [progress, setProgress] = useState<LessonProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,8 +23,8 @@ export const useModuleProgress = () => {
 
     const fetchProgress = async () => {
       const { data, error } = await supabase
-        .from('module_progress')
-        .select('module_id, lesson_id, completed')
+        .from('user_lessons')
+        .select('module_id, lesson_id, lesson_number, completed')
         .eq('user_id', user.id);
 
       if (!error && data) {
@@ -35,15 +36,16 @@ export const useModuleProgress = () => {
     fetchProgress();
   }, [user]);
 
-  const markLessonComplete = async (moduleId: number, lessonId: number) => {
+  const markLessonComplete = async (moduleId: number, lessonId: number, lessonNumber: number = 1) => {
     if (!user) return;
 
     const { error } = await supabase
-      .from('module_progress')
+      .from('user_lessons')
       .upsert({
         user_id: user.id,
         module_id: moduleId,
         lesson_id: lessonId,
+        lesson_number: lessonNumber,
         completed: true,
         completed_at: new Date().toISOString(),
       }, {
@@ -53,7 +55,7 @@ export const useModuleProgress = () => {
     if (!error) {
       setProgress(prev => [
         ...prev.filter(p => !(p.module_id === moduleId && p.lesson_id === lessonId)),
-        { module_id: moduleId, lesson_id: lessonId, completed: true }
+        { module_id: moduleId, lesson_id: lessonId, lesson_number: lessonNumber, completed: true }
       ]);
     }
   };
