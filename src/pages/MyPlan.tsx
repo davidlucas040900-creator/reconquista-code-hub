@@ -76,14 +76,14 @@ const MyPlan = () => {
   useEffect(() => {
     const fetchSubscription = async () => {
       if (user) {
-        const { data } = await supabase
+        const { data } = await (supabase as any)
           .from('profiles')
           .select('subscription_tier, subscription_expires_at')
           .eq('id', user.id)
-          .single() as any;
+          .maybeSingle();
         
         if (data) {
-          setCurrentTier(data.subscription_tier);
+          setCurrentTier(data.subscription_tier || 'mensal');
           setExpiresAt(data.subscription_expires_at);
         }
       }

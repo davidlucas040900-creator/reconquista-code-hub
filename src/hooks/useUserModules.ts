@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export interface UserModule {
   id: string;
+  user_id: string;
   module_number: number;
   module_name: string;
   release_date: string;
@@ -25,15 +26,16 @@ export const useUserModules = () => {
     }
 
     const fetchModules = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_modules')
         .select('*')
         .eq('user_id', user.id)
-        .order('module_number', { ascending: true }) as any;
-
+        .order('module_number', { ascending: true });
+      
       if (!error && data) {
         setModules(data as UserModule[]);
       }
+      
       setLoading(false);
     };
 
@@ -65,8 +67,8 @@ export const useUserModules = () => {
     if (!user) return;
 
     const { error } = await supabase
-      .from('user_modules')
-      .update({ is_completed: true } as any)
+      .from('user_modules' as any)
+      .update({ is_completed: true })
       .eq('user_id', user.id)
       .eq('module_number', moduleNumber);
 
