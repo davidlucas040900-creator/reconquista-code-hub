@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 interface LessonProgress {
   module_id: number;
   lesson_id: number;
-  lesson_number: number;
   completed: boolean;
 }
 
@@ -24,11 +23,11 @@ export const useModuleProgress = () => {
     const fetchProgress = async () => {
       const { data, error } = await supabase
         .from('user_lessons')
-        .select('module_id, lesson_id, lesson_number, completed')
-        .eq('user_id', user.id);
+        .select('module_id, lesson_id, completed')
+        .eq('user_id', user.id) as any;
 
       if (!error && data) {
-        setProgress(data);
+        setProgress(data as LessonProgress[]);
       }
       setLoading(false);
     };
@@ -36,7 +35,7 @@ export const useModuleProgress = () => {
     fetchProgress();
   }, [user]);
 
-  const markLessonComplete = async (moduleId: number, lessonId: number, lessonNumber: number = 1) => {
+  const markLessonComplete = async (moduleId: number, lessonId: number) => {
     if (!user) return;
 
     const { error } = await supabase
@@ -45,17 +44,16 @@ export const useModuleProgress = () => {
         user_id: user.id,
         module_id: moduleId,
         lesson_id: lessonId,
-        lesson_number: lessonNumber,
         completed: true,
         completed_at: new Date().toISOString(),
-      }, {
+      } as any, {
         onConflict: 'user_id,module_id,lesson_id'
       });
 
     if (!error) {
       setProgress(prev => [
         ...prev.filter(p => !(p.module_id === moduleId && p.lesson_id === lessonId)),
-        { module_id: moduleId, lesson_id: lessonId, lesson_number: lessonNumber, completed: true }
+        { module_id: moduleId, lesson_id: lessonId, completed: true }
       ]);
     }
   };

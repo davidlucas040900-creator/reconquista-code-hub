@@ -5,8 +5,11 @@ import { modules } from '@/data/modules';
 import { ModuleCard } from '@/components/ModuleCard';
 import { JourneyMap } from '@/components/JourneyMap';
 import { useUserModules } from '@/hooks/useUserModules';
+import { WeeklyChallengeCard } from '@/components/WeeklyChallengeCard';
+import { UpsellCarousel } from '@/components/UpsellCarousel';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
-import { LogOut, Award, TrendingUp, Lock } from 'lucide-react';
+import { LogOut, Award, TrendingUp, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -79,15 +82,27 @@ const Dashboard = () => {
               <span className="font-bold text-lg hidden sm:inline">Código da Reconquista</span>
             </div>
 
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="gap-2 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/meu-plano')}
+                className="gap-2"
+              >
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline">Meu Plano</span>
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="gap-2 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
+            </div>
           </div>
         </div>
       </nav>
@@ -155,6 +170,9 @@ const Dashboard = () => {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/10 rounded-full blur-3xl" />
         </section>
 
+        {/* Weekly Challenge */}
+        <WeeklyChallengeCard />
+
         {/* Main Course Carousel */}
         <section className="space-y-6">
           <div>
@@ -174,6 +192,9 @@ const Dashboard = () => {
             </div>
           </div>
         </section>
+
+        {/* Upsell Section */}
+        <UpsellCarousel />
 
         {/* Bonus Section */}
         <section className="space-y-6">

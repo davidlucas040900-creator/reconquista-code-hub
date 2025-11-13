@@ -29,10 +29,10 @@ export const useUserModules = () => {
         .from('user_modules')
         .select('*')
         .eq('user_id', user.id)
-        .order('module_number', { ascending: true });
+        .order('module_number', { ascending: true }) as any;
 
       if (!error && data) {
-        setModules(data);
+        setModules(data as UserModule[]);
       }
       setLoading(false);
     };
@@ -66,7 +66,7 @@ export const useUserModules = () => {
 
     const { error } = await supabase
       .from('user_modules')
-      .update({ is_completed: true })
+      .update({ is_completed: true } as any)
       .eq('user_id', user.id)
       .eq('module_number', moduleNumber);
 
