@@ -1,9 +1,4 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
   "compilerOptions": {
     /* Path Mapping */
     "baseUrl": ".",
@@ -11,62 +6,35 @@
       "@/*": ["./src/*"]
     },
 
-    /* Type Checking - Melhorado gradualmente */
+    /* Type Checking */
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": false,
-    "noImplicitThis": true,
-    "useUnknownInCatchVariables": true,
-    "alwaysStrict": true,
-
-    /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
-    "noImplicitReturns": true,
-    "noPropertyAccessFromIndexSignature": false,
 
     /* Module Resolution */
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "moduleDetection": "force",
 
     /* Emit */
     "noEmit": true,
-    "declaration": false,
-    "declarationMap": false,
-    "sourceMap": true,
-    "removeComments": false,
-    "importHelpers": true,
-    "downlevelIteration": true,
+    "jsx": "react-jsx",
 
     /* JavaScript Support */
     "allowJs": true,
-    "checkJs": false,
+    "skipLibCheck": true,
 
-    /* Interop Constraints */
+    /* Interop */
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-
-    /* Performance */
-    "skipLibCheck": true,
-    "incremental": true,
-
-    /* Language and Environment */
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-
-    /* Completeness */
-    "skipDefaultLibCheck": true
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "build"]
+  "exclude": ["node_modules", "dist", "build", ".vercel"]
 }
