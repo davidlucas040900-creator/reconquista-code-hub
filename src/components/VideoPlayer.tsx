@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
+import { Loader2 } from 'lucide-react';
 
 interface VideoPlayerProps {
   youtubeId: string;
@@ -12,35 +13,22 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
   const playerRef = useRef<HTMLDivElement>(null);
   const plyrInstanceRef = useRef<Plyr | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!playerRef.current || !youtubeId) {
-      setError('ID do vídeo não fornecido');
-      return;
-    }
+    if (!playerRef.current || !youtubeId) return;
+
+    setIsLoading(true);
 
     // Limpar instância anterior
     if (plyrInstanceRef.current) {
       plyrInstanceRef.current.destroy();
     }
 
-    console.log('🎬 Inicializando player com ID:', youtubeId);
-
     try {
-      // Criar nova instância do Plyr
       const player = new Plyr(playerRef.current, {
-        controls: [
-          'play-large',
-          'play',
-          'progress',
-          'current-time',
-          'mute',
-          'volume',
-          'settings',
-          'pip',
-          'fullscreen'
-        ],
+        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'pip', 'fullscreen'],
         settings: ['quality', 'speed'],
         youtube: {
           noCookie: true,
@@ -54,15 +42,15 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
 
       plyrInstanceRef.current = player;
 
-      // Event Listeners
+      // Loading completo quando o player está pronto
       player.on('ready', () => {
-        console.log('✅ Player pronto');
+        setIsLoading(false);
         setError(null);
       });
 
-      player.on('error', (event) => {
-        console.error('❌ Erro no player:', event);
-        setError('Erro ao carregar vídeo. Verifique o ID do YouTube.');
+      player.on('error', () => {
+        setError('Erro ao carregar vídeo');
+        setIsLoading(false);
       });
 
       player.on('timeupdate', () => {
@@ -70,7 +58,6 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
           const percentage = (player.currentTime / player.duration) * 100;
           onProgress?.(Math.round(percentage));
 
-          // Trigger completion ao atingir 90%
           if (percentage >= 90 && !hasCompleted) {
             setHasCompleted(true);
             onComplete?.();
@@ -78,56 +65,59 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
         }
       });
 
-      player.on('playing', () => {
-        console.log('▶️ Vídeo reproduzindo');
-      });
-
     } catch (error) {
-      console.error('❌ Erro ao criar player:', error);
       setError('Falha ao inicializar player');
+      setIsLoading(false);
     }
 
-    // Cleanup
     return () => {
       if (plyrInstanceRef.current) {
         plyrInstanceRef.current.destroy();
-        plyrInstanceRef.current = null;
       }
     };
   }, [youtubeId]);
 
-  // Renderizar fallback se houver erro
-  if (error) {
-    return (
-      <div className="w-full aspect-video bg-gray-900 rounded-xl flex items-center justify-center">
-        <div className="text-center p-8">
-          <p className="text-red-500 mb-4">❌ {error}</p>
-          <p className="text-gray-400 text-sm mb-4">ID do vídeo: {youtubeId}</p>
-          <a
-            href={`https://www.youtube.com/watch?v=${youtubeId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:underline"
-          >
-            Abrir no YouTube
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black">
+      {/* Loading Skeleton */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center z-10">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-white text-sm">Carregando vídeo...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
+          <div className="text-center p-8">
+            <p className="text-red-500 mb-4">❌ {error}</p>
+            <a
+              href={`https://www.youtube.com/watch?v=${youtubeId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              Abrir no YouTube
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Player */}
       <div
         ref={playerRef}
         data-plyr-provider="youtube"
         data-plyr-embed-id={youtubeId}
+        className={isLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-500'}
       />
+
       <style>{`
         :root {
           --plyr-color-main: #FFD700;
           --plyr-video-control-background-hover: #E50914;
-          --plyr-video-control-color: #ffffff;
         }
       `}</style>
     </div>
