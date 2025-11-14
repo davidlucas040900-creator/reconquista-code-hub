@@ -28,7 +28,13 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comunidade" element={<Community />} />
               <Route path="/meu-plano" element={<MyPlan />} />
-              <Route path="/:moduleSlug/:lessonId" element={<Lesson />} />
+              
+              {/* ✅ ROTAS CORRIGIDAS - Suportam múltiplos formatos */}
+              <Route path="/modulo/:moduleId/aula/:lessonId" element={<Lesson />} />
+              <Route path="/modulo-:moduleId/aula-:lessonId" element={<Lesson />} />
+              <Route path="/:moduleSlug/:lessonSlug" element={<Lesson />} />
+              
+              {/* Catch-all deve ser a ÚLTIMA rota */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
