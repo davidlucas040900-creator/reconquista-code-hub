@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, Home, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { MarkAsCompletedButton } from '@/components/MarkAsCompletedButton';
 import { MaterialsSection } from '@/components/MaterialsSection';
+import { CelebrationModal } from '@/components/CelebrationModal';
 import Plyr from 'plyr-react';
 import 'plyr-react/plyr.css';
 
@@ -14,6 +15,7 @@ const Lesson = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [showCelebration, setShowCelebration] = useState(false);
+  const [videoWatched, setVideoWatched] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,8 +44,23 @@ const Lesson = () => {
   const isLastLesson = currentLessonIndex === module.lessons.length - 1;
 
   const handleVideoEnd = () => {
-    setShowCelebration(true);
-    setTimeout(() => setShowCelebration(false), 3000);
+    if (!videoWatched) {
+      setVideoWatched(true);
+      setShowCelebration(true);
+    }
+  };
+
+  const handleCloseWelcome = () => {
+    setShowCelebration(false);
+  };
+
+  const handleNextLessonFromModal = () => {
+    setShowCelebration(false);
+    if (nextLesson) {
+      navigate(`/${moduleSlug}/${nextLesson.id}`);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   const plyrProps = {
@@ -67,6 +84,14 @@ const Lesson = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Celebration Modal */}
+      <CelebrationModal 
+        isOpen={showCelebration}
+        onClose={handleCloseWelcome}
+        lessonTitle={lesson.title}
+        onNextLesson={nextLesson ? handleNextLessonFromModal : undefined}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

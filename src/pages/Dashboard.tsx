@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Award, TrendingUp, Lock, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { WelcomeModal } from '@/components/WelcomeModal';
+import { ValueBreakdownCard } from '@/components/ValueBreakdownCard';
 
 const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
@@ -71,6 +73,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <WelcomeModal />
       {/* Top Navigation */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -120,6 +123,11 @@ const Dashboard = () => {
         {/* Welcome Banner */}
         <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/10 to-background border border-border p-8 md:p-12">
           <div className="relative z-10 max-w-3xl">
+            {/* Value Breakdown Card - moved here */}
+            <div className="mb-8">
+              <ValueBreakdownCard />
+            </div>
+
             <div className="mb-6 flex justify-center md:justify-start">
               <img 
                 src="https://pub-335435355c6548d7987945a540eca66b.r2.dev/LOGO%20NA%20PAGINA%20INICIAL%20DA%20AREA%20DE%20MEMBRO.webp"
