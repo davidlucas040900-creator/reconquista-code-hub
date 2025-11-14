@@ -1,7 +1,3 @@
-═══════════════════════════════════════════════════════════
-📄 ARQUIVO CORRIGIDO: src/data/lessons.ts
-═══════════════════════════════════════════════════════════
-
 // ═══════════════════════════════════════════════════════════
 // TIPOS E INTERFACES
 // ═══════════════════════════════════════════════════════════
@@ -12,10 +8,10 @@ export interface LessonData {
   title: string;
   videoId: string;
   description: string;
-  duration?: string; // Ex: "8 min"
-  views?: string; // Ex: "1.4M"
+  duration?: string;
+  views?: string;
   isBonus?: boolean;
-  order?: number; // Ordem de exibição
+  order?: number;
 }
 
 export interface ModuleStats {
@@ -30,9 +26,7 @@ export interface ModuleStats {
 // ═══════════════════════════════════════════════════════════
 
 export const lessonsData: LessonData[] = [
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 1 - RESET EMOCIONAL (7 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 1, 
     lesson: 1, 
@@ -107,9 +101,7 @@ export const lessonsData: LessonData[] = [
     order: 7
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 2 - MAPA DA MENTE MASCULINA (7 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 2, 
     lesson: 1, 
@@ -124,7 +116,7 @@ export const lessonsData: LessonData[] = [
     module: 2, 
     lesson: 2, 
     title: "COMO CONTROLAR A MENTE DE UM HOMEM?", 
-    videoId: "-pfXXwkNWTk", // ✅ CORRIGIDO (adicionado hífen)
+    videoId: "-pfXXwkNWTk",
     description: "Aprenda os mecanismos psicológicos que regem decisões masculinas.",
     duration: "9 min",
     views: "316K",
@@ -184,9 +176,7 @@ export const lessonsData: LessonData[] = [
     order: 7
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 3 - GATILHOS DA MEMÓRIA EMOCIONAL (4 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 3, 
     lesson: 1, 
@@ -229,9 +219,7 @@ export const lessonsData: LessonData[] = [
     order: 4
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 4 - A FRASE DE 5 PALAVRAS (3 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 4, 
     lesson: 1, 
@@ -263,14 +251,12 @@ export const lessonsData: LessonData[] = [
     order: 3
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 5 - PRIMEIRO CONTATO ESTRATÉGICO (3 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 5, 
     lesson: 1, 
     title: "O EX APARECEU? FAÇA CERTO DESSA VEZ!", 
-    videoId: "-6YSO7AYrZI", // ✅ CORRIGIDO (adicionado hífen)
+    videoId: "-6YSO7AYrZI",
     description: "O que dizer e fazer quando ele te procura.",
     duration: "12 min",
     views: "241K",
@@ -297,9 +283,7 @@ export const lessonsData: LessonData[] = [
     order: 3
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 6 - DOMÍNIO DA CONVERSA (5 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 6, 
     lesson: 1, 
@@ -353,9 +337,7 @@ export const lessonsData: LessonData[] = [
     order: 5
   },
 
-  // ═══════════════════════════════════════════════════════════
   // MÓDULO 7 - CONQUISTA DURADOURA (6 AULAS)
-  // ═══════════════════════════════════════════════════════════
   { 
     module: 7, 
     lesson: 1, 
@@ -424,19 +406,15 @@ export const lessonsData: LessonData[] = [
 // ÍNDICES PARA PERFORMANCE (O(1) lookup)
 // ═══════════════════════════════════════════════════════════
 
-// Cache de módulos para busca rápida
 const lessonsByModule = new Map<number, LessonData[]>();
 const lessonByKey = new Map<string, LessonData>();
 
-// Inicializar índices
 lessonsData.forEach(lesson => {
-  // Índice por módulo
   if (!lessonsByModule.has(lesson.module)) {
     lessonsByModule.set(lesson.module, []);
   }
   lessonsByModule.get(lesson.module)!.push(lesson);
   
-  // Índice por chave única
   const key = `${lesson.module}-${lesson.lesson}`;
   lessonByKey.set(key, lesson);
 });
@@ -462,9 +440,6 @@ export const TOTAL_LESSONS = 35;
 // HELPER FUNCTIONS OTIMIZADAS
 // ═══════════════════════════════════════════════════════════
 
-/**
- * Busca uma aula específica - O(1) com Map
- */
 export const getLessonData = (moduleNumber: number, lessonNumber: number): LessonData | undefined => {
   const key = `${moduleNumber}-${lessonNumber}`;
   const lesson = lessonByKey.get(key);
@@ -476,9 +451,6 @@ export const getLessonData = (moduleNumber: number, lessonNumber: number): Lesso
   return lesson;
 };
 
-/**
- * Retorna todas as aulas de um módulo - O(1) com Map
- */
 export const getModuleLessons = (moduleNumber: number): LessonData[] => {
   const lessons = lessonsByModule.get(moduleNumber) || [];
   
@@ -489,9 +461,6 @@ export const getModuleLessons = (moduleNumber: number): LessonData[] => {
   return lessons;
 };
 
-/**
- * Retorna a próxima aula (mesmo módulo ou próximo módulo)
- */
 export const getNextLesson = (moduleNumber: number, lessonNumber: number): LessonData | null => {
   const currentIndex = lessonsData.findIndex(
     l => l.module === moduleNumber && l.lesson === lessonNumber
@@ -504,9 +473,6 @@ export const getNextLesson = (moduleNumber: number, lessonNumber: number): Lesso
   return lessonsData[currentIndex + 1];
 };
 
-/**
- * Retorna a aula anterior
- */
 export const getPreviousLesson = (moduleNumber: number, lessonNumber: number): LessonData | null => {
   const currentIndex = lessonsData.findIndex(
     l => l.module === moduleNumber && l.lesson === lessonNumber
@@ -519,9 +485,6 @@ export const getPreviousLesson = (moduleNumber: number, lessonNumber: number): L
   return lessonsData[currentIndex - 1];
 };
 
-/**
- * Total de aulas (geral ou por módulo)
- */
 export const getTotalLessons = (moduleNumber?: number): number => {
   if (moduleNumber) {
     return lessonsByModule.get(moduleNumber)?.length || 0;
@@ -529,9 +492,6 @@ export const getTotalLessons = (moduleNumber?: number): number => {
   return lessonsData.length;
 };
 
-/**
- * Calcula progresso do módulo
- */
 export const getModuleProgress = (moduleNumber: number, completedLessons: number[]): number => {
   const moduleLessons = getModuleLessons(moduleNumber);
   const completed = moduleLessons.filter(l => 
@@ -543,9 +503,6 @@ export const getModuleProgress = (moduleNumber: number, completedLessons: number
     : 0;
 };
 
-/**
- * Estatísticas de um módulo
- */
 export const getModuleStats = (moduleNumber: number): ModuleStats => {
   const lessons = getModuleLessons(moduleNumber);
   const bonusLessons = lessons.filter(l => l.isBonus).length;
@@ -557,23 +514,14 @@ export const getModuleStats = (moduleNumber: number): ModuleStats => {
   };
 };
 
-/**
- * Retorna apenas aulas regulares (não bónus)
- */
 export const getRegularLessons = (moduleNumber: number): LessonData[] => {
   return getModuleLessons(moduleNumber).filter(l => !l.isBonus);
 };
 
-/**
- * Retorna apenas aulas bónus
- */
 export const getBonusLessons = (moduleNumber: number): LessonData[] => {
   return getModuleLessons(moduleNumber).filter(l => l.isBonus);
 };
 
-/**
- * Valida se todos os módulos têm a contagem esperada
- */
 export const validateLessonCounts = (): boolean => {
   let isValid = true;
   
@@ -588,9 +536,6 @@ export const validateLessonCounts = (): boolean => {
   return isValid;
 };
 
-/**
- * Verifica duplicatas de videoId
- */
 export const checkDuplicateVideos = (): void => {
   const videoIds = new Set<string>();
   const duplicates: string[] = [];
@@ -608,27 +553,16 @@ export const checkDuplicateVideos = (): void => {
   }
 };
 
-/**
- * Valida formato do YouTube ID
- */
 export const isValidYouTubeId = (videoId: string): boolean => {
-  // YouTube IDs têm 11 caracteres (ou 12 com hífen inicial para não listados)
   return /^-?[\w-]{11}$/.test(videoId);
 };
 
-/**
- * Valida integridade dos dados
- */
 export const validateLessonsData = (): void => {
   console.log('🔍 Validando dados das aulas...');
   
-  // Validar contagens
   validateLessonCounts();
-  
-  // Verificar duplicatas
   checkDuplicateVideos();
   
-  // Validar YouTube IDs
   lessonsData.forEach(lesson => {
     if (!isValidYouTubeId(lesson.videoId)) {
       console.error(`❌ YouTube ID inválido no Módulo ${lesson.module}, Aula ${lesson.lesson}: ${lesson.videoId}`);
@@ -639,12 +573,6 @@ export const validateLessonsData = (): void => {
   console.log(`✅ Total de módulos: ${lessonsByModule.size}`);
 };
 
-// ═══════════════════════════════════════════════════════════
-// EXECUTAR VALIDAÇÃO EM DESENVOLVIMENTO
-// ═══════════════════════════════════════════════════════════
-
 if (import.meta.env?.DEV) {
   validateLessonsData();
 }
-
-═══════════════════════════════════════════════════════════
