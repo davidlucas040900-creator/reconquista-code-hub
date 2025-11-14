@@ -25,6 +25,23 @@ export function ModuleCard({ module, onClick }: ModuleCardProps) {
   const isCompleted = (module.progress || 0) >= 100;
 
   // ═══════════════════════════════════════════════════════════
+  // MAPEAMENTO DE BADGES (APENAS MÓDULOS ESPECÍFICOS)
+  // ═══════════════════════════════════════════════════════════
+  const getBadgeOverride = (moduleNumber: number, originalBadge: string | null | undefined): string | null | undefined => {
+    const overrides: Record<number, string> = {
+      1: 'MAIS VISTO',
+      2: 'RECOMENDADO',
+      5: 'MAIS VISTO',
+      6: 'RECOMENDADO',
+      7: 'NOVO',
+    };
+    
+    return overrides[moduleNumber] !== undefined ? overrides[moduleNumber] : originalBadge;
+  };
+
+  const actualBadge = getBadgeOverride(module.number, module.badge);
+
+  // ═══════════════════════════════════════════════════════════
   // CONFIGURAÇÃO DOS BADGES
   // ═══════════════════════════════════════════════════════════
   const getBadgeConfig = (badgeText: string | null | undefined) => {
@@ -66,7 +83,7 @@ export function ModuleCard({ module, onClick }: ModuleCardProps) {
     }
   };
 
-  const badgeConfig = getBadgeConfig(module.badge);
+  const badgeConfig = getBadgeConfig(actualBadge);
 
   // ═══════════════════════════════════════════════════════════
   // DETERMINAR TEXTO E ÍCONE DO BOTÃO
