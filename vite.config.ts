@@ -6,6 +6,11 @@ import { componentTagger } from 'lovable-tagger';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   // ═══════════════════════════════════════════════════════════
+  // BASE PATH (importante para Vercel)
+  // ═══════════════════════════════════════════════════════════
+  base: '/',
+
+  // ═══════════════════════════════════════════════════════════
   // SERVER CONFIGURATION
   // ═══════════════════════════════════════════════════════════
   server: {
@@ -14,18 +19,10 @@ export default defineConfig(({ mode }) => ({
     strictPort: false,
     open: false,
     cors: true,
-    // Proxy para Supabase (se necessário em dev)
-    // proxy: {
-    //   '/api': {
-    //     target: process.env.VITE_SUPABASE_URL,
-    //     changeOrigin: true,
-    //     rewrite: (path) => path.replace(/^\/api/, ''),
-    //   },
-    // },
   },
 
   // ═══════════════════════════════════════════════════════════
-  // PREVIEW CONFIGURATION (para npm run preview)
+  // PREVIEW CONFIGURATION
   // ═══════════════════════════════════════════════════════════
   preview: {
     host: '::',
@@ -39,8 +36,7 @@ export default defineConfig(({ mode }) => ({
   // ═══════════════════════════════════════════════════════════
   plugins: [
     react({
-      // SWC optimizations
-      jsxImportSource: '@emotion/react',
+      // ✅ SWC otimizado para React puro (sem Emotion)
       plugins: [],
     }),
     mode === 'development' && componentTagger(),
@@ -62,7 +58,7 @@ export default defineConfig(({ mode }) => ({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: mode === 'development',
-    minify: 'esbuild',
+    minify: mode === 'production' ? 'esbuild' : false,
     target: 'es2020',
     
     // Chunk size warnings
@@ -71,42 +67,56 @@ export default defineConfig(({ mode }) => ({
     // Rollup options para otimização de chunks
     rollupOptions: {
       output: {
-        // Manual chunk splitting para melhor cache
-        manualChunks: {
-          // Vendor chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip',
-          ],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'video-vendor': ['plyr', 'plyr-react'],
-          
-          // Feature chunks
-          'auth': [
-            './src/contexts/AuthContext',
-            './src/hooks/useAuth',
-          ],
+        // ✅ Manual chunk splitting corrigido
+        manualChunks: (id) => {
+          // React core
+          if (id.includes('node_modules/react') || 
+              id.includes('node_modules/react-dom') || 
+              id.includes('node_modules/react-router-dom')) {
+            return 'react-vendor';
+          }
+
+          // Radix UI components
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'ui-vendor';
+          }
+
+          // Supabase
+          if (id.includes('node_modules/@supabase')) {
+            return 'supabase-vendor';
+          }
+
+          // Video player
+          if (id.includes('node_modules/plyr')) {
+            return 'video-vendor';
+          }
+
+          // Lucide icons
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons-vendor';
+          }
+
+          // Other large dependencies
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
         },
         
         // Naming pattern para assets
         assetFileNames: (assetInfo) => {
-          const info = assetInfo.name.split('.');
-          const ext = info[info.length - 1];
+          const name = assetInfo.name || '';
           
-          if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico|webp)$/i.test(assetInfo.name)) {
-            return `assets/images/[name]-[hash][extname]`;
+          if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico|webp)$/i.test(name)) {
+            return 'assets/images/[name]-[hash][extname]';
           }
-          if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
-            return `assets/fonts/[name]-[hash][extname]`;
+          if (/\.(woff2?|eot|ttf|otf)$/i.test(name)) {
+            return 'assets/fonts/[name]-[hash][extname]';
           }
-          if (/\.css$/i.test(assetInfo.name)) {
-            return `assets/css/[name]-[hash][extname]`;
+          if (/\.css$/i.test(name)) {
+            return 'assets/css/[name]-[hash][extname]';
           }
           
-          return `assets/[name]-[hash][extname]`;
+          return 'assets/[name]-[hash][extname]';
         },
         
         // Naming pattern para chunks
@@ -118,8 +128,8 @@ export default defineConfig(({ mode }) => ({
     // Compression
     cssCodeSplit: true,
     
-    // Report compressed size
-    reportCompressedSize: true,
+    // Report compressed size (desabilitar em CI para velocidade)
+    reportCompressedSize: mode !== 'production',
     
     // CommonJS options
     commonjsOptions: {
@@ -138,6 +148,7 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@supabase/supabase-js',
       'plyr-react',
+      'lucide-react',
     ],
     exclude: ['lovable-tagger'],
   },
@@ -152,16 +163,39 @@ export default defineConfig(({ mode }) => ({
   // ═══════════════════════════════════════════════════════════
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    // Remove console.log e debugger em produção
     drop: mode === 'production' ? ['console', 'debugger'] : [],
+    // Otimizações de minificação
+    ...(mode === 'production' && {
+      minifyIdentifiers: true,
+      minifySyntax: true,
+      minifyWhitespace: true,
+    }),
   },
 
   // ═══════════════════════════════════════════════════════════
   // CSS OPTIONS
   // ═══════════════════════════════════════════════════════════
   css: {
-    devSourcemap: true,
+    devSourcemap: mode === 'development',
     modules: {
       localsConvention: 'camelCase',
     },
+    // Minificação CSS
+    ...(mode === 'production' && {
+      preprocessorOptions: {
+        css: {
+          charset: false,
+        },
+      },
+    }),
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // DEFINE (constantes globais)
+  // ═══════════════════════════════════════════════════════════
+  define: {
+    __DEV__: JSON.stringify(mode === 'development'),
+    __PROD__: JSON.stringify(mode === 'production'),
   },
 }));
