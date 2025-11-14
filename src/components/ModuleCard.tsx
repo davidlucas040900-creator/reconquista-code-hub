@@ -1,89 +1,163 @@
-import { Module } from '@/data/modules';
-import { Play, Clock, BookOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Lock, PlayCircle, CheckCircle, TrendingUp } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface ModuleCardProps {
-  module: Module;
+  module: {
+    id: number;
+    number: number;
+    title: string;
+    slug: string;
+    description: string;
+    thumbnail: string;
+    duration: string;
+    totalLessons: number;
+    progress?: number;
+    badge?: string | null;
+  };
+  isReleased?: boolean;
+  releaseDate?: string;
+  onClick?: () => void;
 }
 
-export const ModuleCard = ({ module }: ModuleCardProps) => {
-  const navigate = useNavigate();
+export function ModuleCard({ module, isReleased = true, releaseDate, onClick }: ModuleCardProps) {
+  const isLocked = !isReleased;
 
   const handleClick = () => {
-    if (module.lessons.length > 0) {
-      navigate(`/modulo/${module.slug}/aula/${module.lessons[0].id}`);
+    if (!isLocked && onClick) {
+      onClick();
     }
   };
 
   return (
-    <div
+    <Card
       onClick={handleClick}
-      className="group relative flex-shrink-0 w-64 md:w-80 cursor-pointer transition-all duration-300 hover:scale-105"
+      className={`relative snap-start flex-shrink-0 w-[300px] sm:w-[350px] overflow-hidden group transition-all duration-300 ${
+        isLocked
+          ? 'opacity-60 cursor-not-allowed'
+          : 'cursor-pointer hover:scale-105 hover:shadow-2xl hover:border-primary/50'
+      }`}
     >
-      {/* Thumbnail container */}
-      <div className="relative overflow-hidden rounded-xl aspect-video bg-muted">
+      {/* Thumbnail */}
+      <div className="relative aspect-video overflow-hidden bg-muted">
         <img
           src={module.thumbnail}
           alt={module.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           loading="lazy"
+          className={`w-full h-full object-cover transition-transform duration-300 ${
+            isLocked ? 'grayscale' : 'group-hover:scale-110'
+          }`}
         />
         
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-
-        {/* Badge */}
-        {module.badge && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-              module.badge === 'NOVO' 
-                ? 'bg-primary text-primary-foreground animate-glow' 
-                : 'bg-secondary text-secondary-foreground'
-            }`}>
-              {module.badge}
-            </span>
+        {/* Lock Overlay */}
+        {isLocked && (
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
+            <div className="text-center px-4">
+              <Lock className="w-12 h-12 text-white/80 mx-auto mb-3 animate-pulse" />
+              <p className="text-white font-semibold text-sm">Módulo Bloqueado</p>
+              {releaseDate && (
+                <p className="text-white/80 text-xs mt-1">
+                  Liberado em: {new Date(releaseDate).toLocaleDateString('pt-PT', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Play icon on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="bg-primary/90 rounded-full p-4 transform scale-90 group-hover:scale-100 transition-transform">
-            <Play className="w-8 h-8 text-primary-foreground fill-current" />
+        {/* Badge */}
+        {module.badge && !isLocked && (
+          <div className="absolute top-3 right-3">
+            <Badge 
+              variant="secondary"
+              className="bg-primary/90 text-primary-foreground backdrop-blur-sm shadow-lg"
+            >
+              {module.badge}
+            </Badge>
+          </div>
+        )}
+
+        {/* Module Number */}
+        <div className="absolute top-3 left-3">
+          <div className="bg-black/60 backdrop-blur-sm text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-sm border-2 border-white/20">
+            {module.number}
           </div>
         </div>
 
-        {/* Progress bar */}
-        {module.progress > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
-            <div 
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${module.progress}%` }}
-            />
+        {/* Play Icon Overlay */}
+        {!isLocked && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <div className="transform scale-75 group-hover:scale-100 transition-transform duration-300">
+              <PlayCircle className="w-20 h-20 text-white drop-shadow-2xl" />
+            </div>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="mt-3 space-y-2">
-        <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors line-clamp-1">
-          {module.title}
-        </h3>
-        
-        <p className="text-sm text-muted-foreground line-clamp-2">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <h3 className="text-xl font-bold text-foreground line-clamp-2 flex-1 group-hover:text-primary transition-colors">
+            {module.title}
+          </h3>
+        </div>
+
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">
           {module.description}
         </p>
 
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+        {/* Meta Info */}
+        <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+          <span className="flex items-center gap-1.5">
+            <PlayCircle className="w-4 h-4" />
+            <span className="font-medium">{module.totalLessons} aulas</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             {module.duration}
           </span>
-          <span className="flex items-center gap-1">
-            <BookOpen className="w-3 h-3" />
-            {module.lessons.length} {module.lessons.length === 1 ? 'aula' : 'aulas'}
-          </span>
         </div>
+
+        {/* Progress Bar */}
+        {!isLocked && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground font-medium">Progresso</span>
+              <span className="font-bold text-foreground">{module.progress || 0}%</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out"
+                style={{ width: `${module.progress || 0}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* CTA for unlocked modules */}
+        {!isLocked && (
+          <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="flex items-center justify-center gap-2 text-primary text-sm font-semibold">
+              <span>Começar Módulo</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Shimmer effect on hover */}
+      {!isLocked && (
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+        </div>
+      )}
+    </Card>
   );
-};
+}
