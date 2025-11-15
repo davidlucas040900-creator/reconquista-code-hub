@@ -26,8 +26,9 @@ export function LessonSidebar({ moduleNumber }: LessonSidebarProps) {
 
       const { data } = await supabase
         .from('user_lessons')
-        .select('lesson_id, is_completed')
+        .select('lesson_id, is_completed, module_id')
         .eq('user_id', user.id)
+        .eq('module_id', moduleNumber)
         .eq('is_completed', true);
 
       if (data) {

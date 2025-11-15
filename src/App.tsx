@@ -1,34 +1,40 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Lesson from './pages/Lesson';
+import Community from './pages/Community';
+import MyPlan from './pages/MyPlan';
+import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
 
-// Componente de teste minimalista
-const TestPage = () => (
-  <div style={{
-    backgroundColor: '#1a1a1a',
-    color: 'white',
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '24px',
-    fontFamily: 'sans-serif'
-  }}>
-    <div style={{ textAlign: 'center' }}>
-      <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>✅ React Funcionando!</h1>
-      <p>O problema está nos Contexts ou Páginas.</p>
-    </div>
-  </div>
-);
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <Routes>
-        <Route path="*" element={<TestPage />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/comunidade" element={<Community />} />
+              <Route path="/meu-plano" element={<MyPlan />} />
+              <Route path="/modulo/:moduleId/aula/:lessonId" element={<Lesson />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

@@ -70,9 +70,9 @@ export default function Lesson() {
     // Salvar progresso no Supabase
     await supabase.from('user_lessons').upsert({
       user_id: user.id,
+      module_id: moduleNumber,
       lesson_id: lessonNumber,
       watch_percentage: percentage,
-      last_watched_at: new Date().toISOString(),
     });
   };
 
@@ -81,6 +81,7 @@ export default function Lesson() {
 
     await supabase.from('user_lessons').upsert({
       user_id: user.id,
+      module_id: moduleNumber,
       lesson_id: lessonNumber,
       is_completed: true,
       completed_at: new Date().toISOString(),
