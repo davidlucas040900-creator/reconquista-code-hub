@@ -40,11 +40,14 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+
+        if (error) console.warn('[Dashboard] profiles.maybeSingle error', error);
+
 
         setProfile(data);
       }
