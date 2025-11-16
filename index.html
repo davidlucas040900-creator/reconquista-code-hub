@@ -33,20 +33,30 @@
         var el = document.getElementById('boot-loader');
         if (el) el.style.display = 'none';
       };
-      window.addEventListener('error', function (e) {
+      function showError(title, msg) {
         var el = document.getElementById('boot-loader');
-        if (el) {
-          el.style.display = 'flex';
-          el.innerHTML = '<div style="text-align:center"><div style="margin-bottom:8px;font-weight:700">Erro ao iniciar</div><div style="font-size:12px;opacity:.8">' + (e && e.message ? e.message : 'Falha desconhecida') + '</div></div>';
-        }
+        if (!el) return;
+        el.style.display = 'flex';
+        el.innerHTML = '<div style="text-align:center">\
+          <div style="margin-bottom:8px;font-weight:700">'+title+'</div>\
+          <div style="font-size:12px;opacity:.8;margin-bottom:10px">'+msg+'</div>\
+          <button id="force-clear" style="background:#FFD700;color:#111;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer">Forçar atualização</button>\
+        </div>';
+        var btn = document.getElementById('force-clear');
+        if (btn) btn.onclick = function(){
+          try {
+            var url = new URL(window.location.href);
+            url.searchParams.set('clear','1');
+            window.location.replace(url.toString());
+          } catch { window.location.reload(); }
+        };
+      }
+      window.addEventListener('error', function (e) {
+        showError('Erro ao iniciar', (e && e.message) || 'Falha desconhecida');
       });
       window.addEventListener('unhandledrejection', function (e) {
-        var el = document.getElementById('boot-loader');
-        if (el) {
-          var msg = (e && e.reason && (e.reason.message || e.reason)) || 'Falha desconhecida';
-          el.style.display = 'flex';
-          el.innerHTML = '<div style="text-align:center"><div style="margin-bottom:8px;font-weight:700">Erro ao carregar</div><div style="font-size:12px;opacity:.8">' + msg + '</div></div>';
-        }
+        var msg = (e && e.reason && (e.reason.message || e.reason)) || 'Falha desconhecida';
+        showError('Erro ao carregar', msg);
       });
     </script>
     <script type="module" src="/src/main.tsx"></script>
