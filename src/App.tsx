@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import Login from './pages/Login';
+import Login from './pages/LoginClean';
 import Dashboard from './pages/Dashboard';
 import Lesson from './pages/Lesson';
 import Community from './pages/Community';
