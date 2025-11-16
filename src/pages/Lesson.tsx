@@ -73,6 +73,8 @@ export default function Lesson() {
       module_id: moduleNumber,
       lesson_id: lessonNumber,
       watch_percentage: percentage,
+    }, {
+      onConflict: 'user_id,module_id,lesson_id'
     });
   };
 
@@ -85,6 +87,8 @@ export default function Lesson() {
       lesson_id: lessonNumber,
       is_completed: true,
       completed_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,module_id,lesson_id'
     });
 
     toast.success('🎉 Aula concluída!', {
