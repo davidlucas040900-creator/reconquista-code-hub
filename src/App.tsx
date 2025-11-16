@@ -11,31 +11,34 @@ import Lesson from './pages/Lesson';
 import Community from './pages/Community';
 import MyPlan from './pages/MyPlan';
 import NotFound from './pages/NotFound';
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/comunidade" element={<Community />} />
-              <Route path="/meu-plano" element={<MyPlan />} />
-              <Route path="/modulo/:moduleId/aula/:lessonId" element={<Lesson />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <GlobalErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/comunidade" element={<Community />} />
+                <Route path="/meu-plano" element={<MyPlan />} />
+                <Route path="/modulo/:moduleId/aula/:lessonId" element={<Lesson />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </GlobalErrorBoundary>
 );
 
 export default App;
