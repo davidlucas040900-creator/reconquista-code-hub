@@ -21,7 +21,34 @@
   </head>
 
   <body>
+    <div id="boot-loader" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0d0d0d;color:#fff;font-family:Montserrat,system-ui,sans-serif;z-index:9999;">
+      <div style="text-align:center;opacity:.9">
+        <div style="margin-bottom:12px;font-weight:700">A iniciar aplicação…</div>
+        <div style="font-size:12px;color:#bbb">Se ficar preso aqui, atualiza a página.</div>
+      </div>
+    </div>
     <div id="root"></div>
+    <script>
+      window.__hideBoot = function () {
+        var el = document.getElementById('boot-loader');
+        if (el) el.style.display = 'none';
+      };
+      window.addEventListener('error', function (e) {
+        var el = document.getElementById('boot-loader');
+        if (el) {
+          el.style.display = 'flex';
+          el.innerHTML = '<div style="text-align:center"><div style="margin-bottom:8px;font-weight:700">Erro ao iniciar</div><div style="font-size:12px;opacity:.8">' + (e && e.message ? e.message : 'Falha desconhecida') + '</div></div>';
+        }
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var el = document.getElementById('boot-loader');
+        if (el) {
+          var msg = (e && e.reason && (e.reason.message || e.reason)) || 'Falha desconhecida';
+          el.style.display = 'flex';
+          el.innerHTML = '<div style="text-align:center"><div style="margin-bottom:8px;font-weight:700">Erro ao carregar</div><div style="font-size:12px;opacity:.8">' + msg + '</div></div>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
