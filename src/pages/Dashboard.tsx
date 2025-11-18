@@ -6,6 +6,8 @@ import { getTotalLessons } from '@/data/lessons';
 import { ModuleCard } from '@/components/ModuleCard';
 import { WeeklyChallengeCard } from '@/components/WeeklyChallengeCard';
 import { UpsellCarousel } from '@/components/UpsellCarousel';
+import { PremiumUpsell } from '@/components/PremiumUpsell';
+import { BonusCarousel } from '@/components/BonusCarousel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { LogOut, Award, TrendingUp, Lock, User, Users } from 'lucide-react';
@@ -275,86 +277,14 @@ const Dashboard = () => {
           </div>
         </section>
 
-        {/* Upsell Section */}
+        {/* Recomendado Para Você */}
         <UpsellCarousel />
 
-        {/* Bonus Section */}
-        <section className="space-y-6">
-          <div>
-            <h2 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">
-              O Teu Arsenal Secreto (Bónus)
-            </h2>
-            <p className="text-muted-foreground">Ferramentas práticas para aplicar imediatamente</p>
-          </div>
+        {/* Seção Premium: A Deusa na Cama */}
+        <PremiumUpsell />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="group relative cursor-pointer overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-br from-primary/20 to-background p-6 transition-all hover:scale-105">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-primary/20 p-3">
-                  <span className="text-3xl">📝</span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="mb-2 text-lg font-bold text-foreground">
-                    O Arsenal Secreto: 130 Frases Proibidas
-                  </h3>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    Scripts prontos para cada situação
-                  </p>
-                  <Button variant="outline" size="sm" className="gap-2" disabled>
-                    <Lock className="h-4 w-4" />
-                    Em Breve
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="group relative cursor-pointer overflow-hidden rounded-xl border border-secondary/30 bg-gradient-to-br from-secondary/20 to-background p-6 transition-all hover:scale-105">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-secondary/20 p-3">
-                  <span className="text-3xl">💋</span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="mb-2 text-lg font-bold text-foreground">17 Beijos Que Viciam</h3>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    Técnicas avançadas de sedução física
-                  </p>
-                  <Button variant="outline" size="sm" className="gap-2" disabled>
-                    <Lock className="h-4 w-4" />
-                    Em Breve
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Advanced Section */}
-        <section className="space-y-6">
-          <div>
-            <h2 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">
-              O Próximo Nível (Avançado)
-            </h2>
-            <p className="text-muted-foreground">Conteúdo exclusivo para elevar o teu jogo</p>
-          </div>
-
-          <div className="relative overflow-hidden rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-500/20 to-background p-8">
-            <div className="flex flex-wrap items-center justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-purple-500/20 p-3">
-                  <span className="text-4xl">👑</span>
-                </div>
-                <div>
-                  <h3 className="mb-2 text-xl font-bold text-foreground">A Deusa na Cama</h3>
-                  <p className="text-muted-foreground">Conteúdo premium de sedução avançada</p>
-                </div>
-              </div>
-              <Button className="gap-2 bg-purple-500 text-white hover:bg-purple-600" disabled>
-                <Lock className="h-4 w-4" />
-                Desbloquear Agora
-              </Button>
-            </div>
-          </div>
-        </section>
+        {/* O Teu Arsenal Secreto */}
+        <BonusCarousel />
       </div>
     </div>
   );

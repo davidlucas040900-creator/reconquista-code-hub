@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Plyr from 'plyr-react';
 import 'plyr-react/plyr.css';
+import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 
 interface VideoPlayerProps {
   youtubeId: string;
@@ -48,17 +50,35 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
     const player = event.detail.plyr;
     if (player.duration > 0) {
       const percentage = (player.currentTime / player.duration) * 100;
-      onProgress?.(Math.round(percentage));
+      
+      // Atualizar a cada 5%
+      if (percentage % 5 < 0.5) {
+        onProgress?.(Math.round(percentage));
+      }
 
+      // Celebração aos 90%
       if (percentage >= 90 && !hasCompleted) {
         setHasCompleted(true);
+        
+        // Confetti
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+        
+        // Toast
+        toast.success('🎉 Parabéns!', {
+          description: 'Concluíste esta aula com sucesso!',
+        });
+        
         onComplete?.();
       }
     }
   };
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
       <Plyr 
         source={plyrSource} 
         options={plyrOptions}
