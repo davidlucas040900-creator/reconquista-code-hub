@@ -11,6 +11,7 @@ import Lesson from './pages/Lesson';
 import Community from './pages/Community';
 import MyPlan from './pages/MyPlan';
 import NotFound from './pages/NotFound';
+import AutoLogin from './pages/AutoLogin'; // ← NOVO
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/auto-login" element={<AutoLogin />} /> {/* ← NOVO */}
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comunidade" element={<Community />} />
               <Route path="/meu-plano" element={<MyPlan />} />
