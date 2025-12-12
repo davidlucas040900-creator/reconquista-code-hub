@@ -1,3 +1,4 @@
+﻿import TestPlyr from './pages/TestPlyr';
 // src/App.tsx
 
 import { Toaster } from '@/components/ui/toaster';
@@ -8,18 +9,18 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
-// Páginas públicas
+// PÃ¡ginas pÃºblicas
 import Login from './pages/Login';
 import AutoLogin from './pages/AutoLogin';
 import NotFound from './pages/NotFound';
 
-// Páginas do aluno
+// PÃ¡ginas do aluno
 import Dashboard from './pages/Dashboard';
 import Cursos from './pages/Cursos';
 import CursoDetalhe from './pages/CursoDetalhe';
 import Aula from './pages/Aula';
 
-// Páginas admin
+// PÃ¡ginas admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCursos from './pages/admin/AdminCursos';
 import AdminCursoDetalhe from './pages/admin/AdminCursoDetalhe';
@@ -37,9 +38,10 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Rotas Públicas */}
+              {/* Rotas PÃºblicas */}
               <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="/login" element={<Login />} />
+              <Route path="/test-plyr" element={<TestPlyr />} />
+          <Route path="/login" element={<Login />} />
               <Route path="/auto-login" element={<AutoLogin />} />
 
               {/* Rotas do Aluno */}
@@ -66,3 +68,4 @@ const App = () => (
 );
 
 export default App;
+
