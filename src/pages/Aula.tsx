@@ -1,15 +1,10 @@
 // src/pages/Aula.tsx
 
-<<<<<<< HEAD
 import { useEffect, useState, useRef } from 'react';
-=======
-import { useEffect, useState } from 'react';
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-<<<<<<< HEAD
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -22,9 +17,6 @@ import {
   Menu,
   X
 } from 'lucide-react';
-=======
-import { ChevronLeft, ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 import { toast } from 'sonner';
 
 interface Lesson {
@@ -32,7 +24,6 @@ interface Lesson {
   title: string;
   description: string | null;
   video_url: string | null;
-<<<<<<< HEAD
   duration_minutes: number | null;
   is_bonus: boolean;
   module_id: string;
@@ -56,16 +47,12 @@ interface SidebarModule {
   name: string;
   order_index: number;
   lessons: SidebarLesson[];
-=======
-  is_bonus: boolean;
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 }
 
 export default function Aula() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-<<<<<<< HEAD
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [module, setModule] = useState<Module | null>(null);
@@ -77,11 +64,6 @@ export default function Aula() {
 
   const [prevLesson, setPrevLesson] = useState<string | null>(null);
   const [nextLesson, setNextLesson] = useState<string | null>(null);
-=======
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [loading, setLoading] = useState(true);
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -96,7 +78,6 @@ export default function Aula() {
   }, [user, lessonId]);
 
   const fetchLesson = async () => {
-<<<<<<< HEAD
     if (!user || !lessonId) return;
 
     // Buscar aula
@@ -107,22 +88,10 @@ export default function Aula() {
       .single();
 
     if (!lessonData) {
-=======
-    if (!user) return;
-
-    const { data } = await supabase
-      .from('course_lessons')
-      .select('id, title, description, video_url, is_bonus')
-      .eq('id', lessonId)
-      .single();
-
-    if (!data) {
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       navigate('/dashboard');
       return;
     }
 
-<<<<<<< HEAD
     setLesson(lessonData);
 
     // Buscar módulo
@@ -138,18 +107,10 @@ export default function Aula() {
     const { data: progressData } = await supabase
       .from('user_lesson_progress')
       .select('is_completed, watch_percentage')
-=======
-    setLesson(data);
-
-    const { data: progress } = await supabase
-      .from('user_lesson_progress')
-      .select('is_completed')
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       .eq('user_id', user.id)
       .eq('lesson_id', lessonId)
       .single();
 
-<<<<<<< HEAD
     if (progressData) {
       setIsCompleted(progressData.is_completed);
       setWatchProgress(progressData.watch_percentage || 0);
@@ -222,9 +183,6 @@ export default function Aula() {
       metadata: { lesson_id: lessonId },
     });
 
-=======
-    setIsCompleted(progress?.is_completed || false);
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
     setLoading(false);
   };
 
@@ -238,7 +196,6 @@ export default function Aula() {
       completed_at: new Date().toISOString(),
       watch_percentage: 100,
       last_watched_at: new Date().toISOString(),
-<<<<<<< HEAD
     }, {
       onConflict: 'user_id,lesson_id'
     });
@@ -255,12 +212,6 @@ export default function Aula() {
         ),
       }))
     );
-=======
-    }, { onConflict: 'user_id,lesson_id' });
-
-    setIsCompleted(true);
-    toast.success('Aula marcada como concluída!');
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
   };
 
   if (authLoading || loading) {
@@ -273,7 +224,6 @@ export default function Aula() {
 
   return (
     <div className="min-h-screen bg-background">
-<<<<<<< HEAD
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="px-4">
@@ -298,20 +248,10 @@ export default function Aula() {
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
-=======
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
-        <div className="px-4">
-          <div className="flex h-14 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="font-medium text-foreground truncate">{lesson?.title}</h1>
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
           </div>
         </div>
       </header>
 
-<<<<<<< HEAD
       <div className="flex">
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-6">
@@ -452,47 +392,3 @@ export default function Aula() {
     </div>
   );
 }
-=======
-      <main className="max-w-4xl mx-auto p-4 lg:p-6 space-y-6">
-        <div className="aspect-video bg-black rounded-lg overflow-hidden">
-          {lesson?.video_url ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${lesson.video_url}?rel=0`}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <p className="text-white/50">Vídeo não disponível</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground mb-1">{lesson?.title}</h1>
-            {lesson?.is_bonus && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Bônus</span>
-            )}
-            {lesson?.description && (
-              <p className="text-muted-foreground mt-2">{lesson.description}</p>
-            )}
-          </div>
-
-          <Button onClick={markAsComplete} disabled={isCompleted} variant={isCompleted ? 'outline' : 'default'}>
-            {isCompleted ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Concluída
-              </>
-            ) : (
-              'Marcar como concluída'
-            )}
-          </Button>
-        </div>
-      </main>
-    </div>
-  );
-}
->>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
