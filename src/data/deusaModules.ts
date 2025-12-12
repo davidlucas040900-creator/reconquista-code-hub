@@ -1,0 +1,386 @@
+﻿export interface Lesson {
+  id: number;
+  title: string;
+  description: string;
+  youtubeId: string;
+  duration: string;
+}
+
+export interface Module {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  thumbnail: string;
+  duration: string;
+  lessons: Lesson[];
+  progress: number;
+  badge: 'NOVO' | 'POPULAR' | null;
+}
+
+export const deusaModules: Module[] = [
+  {
+    id: 8,
+    title: 'O Despertar da Deusa',
+    slug: 'despertar-deusa',
+    description: 'Liberte-se da insegurança e abrace seu poder feminino',
+    thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600',
+    duration: '86 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'Como perder a insegurança antes e durante o sexo',
+        description: 'Descubra técnicas para eliminar bloqueios e se conectar com sua confiança natural.',
+        youtubeId: 'BW7wLQECPkc',
+        duration: '15 min',
+      },
+      {
+        id: 2,
+        title: 'A técnica da soltura: destravando o corpo e a mente na cama',
+        description: 'Aprenda a liberar tensões e se entregar completamente ao momento íntimo.',
+        youtubeId: 'YozK0FZu0dU',
+        duration: '18 min',
+      },
+      {
+        id: 3,
+        title: 'Como eliminar a vergonha e assumir sua energia feminina',
+        description: 'Transforme inseguranças em poder e assuma o controle da sua sexualidade.',
+        youtubeId: 'f1mX86Ficio',
+        duration: '20 min',
+      },
+      {
+        id: 4,
+        title: 'Como se soltar e inovar sem medo na hora do sexo',
+        description: 'Explore sua criatividade e ouse experimentar novas formas de prazer.',
+        youtubeId: 'BMS4D7thPrg',
+        duration: '16 min',
+      },
+      {
+        id: 5,
+        title: 'Como perder a vergonha e inovar na hora do sexo',
+        description: 'Quebre barreiras mentais e descubra o que realmente te excita.',
+        youtubeId: 'JocIiA2pX_4',
+        duration: '17 min',
+      },
+    ],
+    progress: 0,
+    badge: 'NOVO',
+  },
+  {
+    id: 9,
+    title: 'O Toque Viciante',
+    slug: 'toque-viciante',
+    description: 'Domine as zonas que deixam qualquer homem viciado',
+    thumbnail: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600',
+    duration: '67 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'Zonas que deixam qualquer homem viciado no seu corpo',
+        description: 'Mapeie os pontos de prazer masculino e use-os estrategicamente.',
+        youtubeId: 'b6xb4VXuv0E',
+        duration: '22 min',
+      },
+      {
+        id: 2,
+        title: '10 zonas erógenas que deixam os homens com muito tesão',
+        description: 'Descubra os segredos da anatomia masculina que poucos conhecem.',
+        youtubeId: 'hfKNqCIw9Ms',
+        duration: '19 min',
+      },
+      {
+        id: 3,
+        title: 'Massagem sensual rápida (5 minutos)',
+        description: 'Técnica express para preparar o clima em poucos minutos.',
+        youtubeId: 'K_UylBFh--E',
+        duration: '12 min',
+      },
+      {
+        id: 4,
+        title: 'Strip Tease fácil para iniciantes (passo a passo)',
+        description: 'Aprenda a criar tensão e desejo através da arte da sedução visual.',
+        youtubeId: 'iLmOtcPCgeM',
+        duration: '14 min',
+      },
+    ],
+    progress: 0,
+    badge: null,
+  },
+  {
+    id: 10,
+    title: 'O Segredo Oral',
+    slug: 'segredo-oral',
+    description: 'Técnicas que enlouquecem e viciam para sempre',
+    thumbnail: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600',
+    duration: '110 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'O mindset das mulheres que enlouquecem no oral',
+        description: 'A mentalidade correta que transforma uma experiência comum em extraordinária.',
+        youtubeId: '8KWHAmtfuEM',
+        duration: '16 min',
+      },
+      {
+        id: 2,
+        title: 'Como fazer o oral perfeito',
+        description: 'Técnica completa, do básico ao avançado, para máximo prazer.',
+        youtubeId: '4NC1OBMw7ao',
+        duration: '21 min',
+      },
+      {
+        id: 3,
+        title: 'Como dar aquela chupada que deixa ele louco',
+        description: 'Movimentos e ritmos que intensificam o prazer masculino.',
+        youtubeId: 'GXKAbadNJVw',
+        duration: '18 min',
+      },
+      {
+        id: 4,
+        title: 'Como chupar direito (avançado)',
+        description: 'Técnicas avançadas para quem quer dominar completamente a arte.',
+        youtubeId: 'F4ZZr2oVtF0',
+        duration: '23 min',
+      },
+      {
+        id: 5,
+        title: 'Técnica da Lambida do Trono',
+        description: 'Movimento secreto que causa sensações intensas e inesquecíveis.',
+        youtubeId: '7oWiE78ns6k',
+        duration: '15 min',
+      },
+      {
+        id: 6,
+        title: 'A técnica da laranja  prazer absoluto',
+        description: 'Método revolucionário inspirado em práticas orientais milenares.',
+        youtubeId: 'Q-DuzZq6vlY',
+        duration: '17 min',
+      },
+    ],
+    progress: 0,
+    badge: 'POPULAR',
+  },
+  {
+    id: 11,
+    title: 'A Cavalgada da Deusa',
+    slug: 'cavalgada-deusa',
+    description: 'Domine a arte da sentada perfeita e deixe-o viciado',
+    thumbnail: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600',
+    duration: '243 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'A Sentada da Deusa (técnica principal)',
+        description: 'A técnica definitiva que transforma você em inesquecível.',
+        youtubeId: 'KE6L8iJQkcA',
+        duration: '24 min',
+      },
+      {
+        id: 2,
+        title: 'Como cavalgá-lo sem cansar',
+        description: 'Posicionamento e respiração para resistência e prazer contínuo.',
+        youtubeId: 'rYgr2sla7Zw',
+        duration: '19 min',
+      },
+      {
+        id: 3,
+        title: 'Técnica de sentada que deixa ele em choque',
+        description: 'Movimento surpreendente que ele nunca experimentou antes.',
+        youtubeId: '5UB_j2B68Ec',
+        duration: '21 min',
+      },
+      {
+        id: 4,
+        title: 'A Sentada Borboleta Paraguaya',
+        description: 'Variação exótica que estimula pontos específicos de prazer.',
+        youtubeId: 'MeF1fGBYSJA',
+        duration: '18 min',
+      },
+      {
+        id: 5,
+        title: 'Posições para máximo estímulo do clitóris',
+        description: 'Ângulos e movimentos para seu próprio prazer intenso.',
+        youtubeId: '-hN9Q7EOiHA',
+        duration: '20 min',
+      },
+      {
+        id: 6,
+        title: 'Sentada da Donzela (movimentos avançados)',
+        description: 'Técnica refinada para quem quer maestria absoluta.',
+        youtubeId: 'l3MSf81Kj_M',
+        duration: '22 min',
+      },
+      {
+        id: 7,
+        title: 'Melhores posições para chegar lá junto com ele',
+        description: 'Sincronização perfeita para orgasmos simultâneos.',
+        youtubeId: '2n_TKNQESHw',
+        duration: '17 min',
+      },
+      {
+        id: 8,
+        title: '3 movimentos para mexer com ele sem dizer nada',
+        description: 'Linguagem corporal que comunica desejo sem palavras.',
+        youtubeId: 'rPRfTBfW9KY',
+        duration: '14 min',
+      },
+      {
+        id: 9,
+        title: '3 posições que eles amam',
+        description: 'As favoritas masculinas que nunca falham.',
+        youtubeId: 'lyUnrpl1KvI',
+        duration: '16 min',
+      },
+      {
+        id: 10,
+        title: 'Movimentos que enlouquecem o boy',
+        description: 'Sequências de movimentos que maximizam o prazer dele.',
+        youtubeId: 'U47Y7B1i78U',
+        duration: '15 min',
+      },
+      {
+        id: 11,
+        title: 'Dicas para movimentos durante a hora H',
+        description: 'Ajustes finos que fazem toda a diferença.',
+        youtubeId: 'P_uqsz-Lhus',
+        duration: '13 min',
+      },
+      {
+        id: 12,
+        title: 'Domine a arte de sentar na cadeira',
+        description: 'Variação criativa para mudar o cenário e intensificar sensações.',
+        youtubeId: '-g61n3QKFRQ',
+        duration: '19 min',
+      },
+      {
+        id: 13,
+        title: 'Pompoarismo para iniciantes (resistência e controle)',
+        description: 'Exercícios de fortalecimento para controle vaginal absoluto.',
+        youtubeId: '9ArZJydu6RY',
+        duration: '25 min',
+      },
+    ],
+    progress: 0,
+    badge: 'POPULAR',
+  },
+  {
+    id: 12,
+    title: 'O Big Bang Sonoro',
+    slug: 'big-bang-sonoro',
+    description: 'Gema e fale de forma irresistível na hora H',
+    thumbnail: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600',
+    duration: '66 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'Como gemer bonito (mesmo tímida)',
+        description: 'Supere a timidez e use sua voz como ferramenta de sedução.',
+        youtubeId: '9NgwS2iDPuA',
+        duration: '14 min',
+      },
+      {
+        id: 2,
+        title: '4 formas de gemer e enlouquecer qualquer homem',
+        description: 'Variações vocais que intensificam o desejo masculino.',
+        youtubeId: 'Y8b8mZYOUrE',
+        duration: '16 min',
+      },
+      {
+        id: 3,
+        title: 'O que falar na hora H (dirty talk para iniciantes)',
+        description: 'Frases e palavras que excitam sem vulgaridade excessiva.',
+        youtubeId: 'zPPC-3MtKyc',
+        duration: '19 min',
+      },
+      {
+        id: 4,
+        title: 'Como perder a vergonha de falar durante o sexo',
+        description: 'Desbloqueie sua comunicação íntima e potencialize a conexão.',
+        youtubeId: 'P9a8-To6NyE',
+        duration: '17 min',
+      },
+    ],
+    progress: 0,
+    badge: null,
+  },
+  {
+    id: 13,
+    title: 'Segredos Profundos',
+    slug: 'segredos-profundos',
+    description: 'Explore novos territórios com segurança e prazer',
+    thumbnail: 'https://images.unsplash.com/photo-1487260211189-670c54da558d?w=600',
+    duration: '105 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'Como dar o C sem dor (guia para iniciantes)',
+        description: 'Preparação completa, física e mental, para primeira experiência.',
+        youtubeId: 'O8vm_IczzSk',
+        duration: '22 min',
+      },
+      {
+        id: 2,
+        title: 'Sexo anal sem dor  técnica essencial',
+        description: 'Método progressivo que garante conforto e prazer gradual.',
+        youtubeId: 'mNLLV-A4JpI',
+        duration: '24 min',
+      },
+      {
+        id: 3,
+        title: 'Como dar a roda com prazer',
+        description: 'Transforme tabu em experiência prazerosa e segura.',
+        youtubeId: 'f_VCUFzxkxU',
+        duration: '20 min',
+      },
+      {
+        id: 4,
+        title: 'Como relaxar e começar no anal de forma segura',
+        description: 'Técnicas de respiração e relaxamento muscular.',
+        youtubeId: 'T1_kLJGFhuA',
+        duration: '18 min',
+      },
+      {
+        id: 5,
+        title: 'Introdução ao mundo dos fetiches (seguro e elegante)',
+        description: 'Explore fantasias de forma consensual, segura e prazerosa.',
+        youtubeId: 'BESJUeTlkVw',
+        duration: '21 min',
+      },
+    ],
+    progress: 0,
+    badge: null,
+  },
+  {
+    id: 14,
+    title: 'Devoção Eterna',
+    slug: 'devocao-eterna',
+    description: 'Mantenha-o apaixonado e conectado para sempre',
+    thumbnail: 'https://images.unsplash.com/photo-1544928147-79a2dbc1f389?w=600',
+    duration: '49 min',
+    lessons: [
+      {
+        id: 1,
+        title: 'Como se comportar após o sexo para aumentar a conexão',
+        description: 'Os minutos após o clímax são cruciais para criar vínculo emocional.',
+        youtubeId: 'QtZXVjJngnk',
+        duration: '16 min',
+      },
+      {
+        id: 2,
+        title: 'Dica para deixá-lo louco após a transa',
+        description: 'Pequenos gestos pós-sexo que criam memórias poderosas.',
+        youtubeId: 'Vt8QD8RsHA0',
+        duration: '14 min',
+      },
+      {
+        id: 3,
+        title: 'O que fazer quando ele some depois do sexo (estratégia da poderosa)',
+        description: 'Resposta estratégica que reestabelece seu valor e atração.',
+        youtubeId: 'irwY5ixTtHY',
+        duration: '19 min',
+      },
+    ],
+    progress: 0,
+    badge: null,
+  },
+];

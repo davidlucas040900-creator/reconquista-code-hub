@@ -1,6 +1,3 @@
-﻿// Importar módulos de ambos os cursos
-import { deusaModules } from './deusaModules';
-
 export interface Lesson {
   id: number;
   title: string;
@@ -21,8 +18,7 @@ export interface Module {
   badge: 'NOVO' | 'POPULAR' | null;
 }
 
-// Módulos do Código da Reconquista (IDs 1-7)
-const codigoReconquistaModules: Module[] = [
+export const modules: Module[] = [
   {
     id: 1,
     title: 'Reset Emocional',
@@ -211,22 +207,3 @@ const codigoReconquistaModules: Module[] = [
     badge: null,
   },
 ];
-
-// Exportar TODOS os módulos (Código da Reconquista + A Deusa na Cama)
-export const modules: Module[] = [
-  ...codigoReconquistaModules,
-  ...deusaModules,
-];
-
-// Funções auxiliares
-export const getModuleById = (id: number): Module | undefined => {
-  return modules.find(m => m.id === id);
-};
-
-export const getModuleBySlug = (slug: string): Module | undefined => {
-  return modules.find(m => m.slug === slug);
-};
-
-// Separar módulos por curso
-export const codigoModules = modules.filter(m => m.id >= 1 && m.id <= 7);
-export const deusaModulesFiltered = modules.filter(m => m.id >= 8 && m.id <= 14);
