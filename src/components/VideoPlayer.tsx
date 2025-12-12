@@ -1,112 +1,244 @@
-﻿import { useEffect, useRef } from "react";
-import Plyr, { APITypes } from "plyr-react";
-import "plyr/dist/plyr.css";
-import { Card } from "@/components/ui/card";
+﻿import { useEffect, useRef, useState } from 'react';
+import Plyr from 'plyr';
+import 'plyr/dist/plyr.css';
+import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 
 interface VideoPlayerProps {
-  videoId: string;
+  youtubeId: string;
+  onProgress?: (percentage: number) => void;
   onComplete?: () => void;
-  poster?: string;
 }
 
-export const VideoPlayer = ({ videoId, onComplete, poster }: VideoPlayerProps) => {
-  const ref = useRef<APITypes>(null);
+export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerProps) {
+  const playerRef = useRef<HTMLDivElement>(null);
+  const plyrInstance = useRef<Plyr | null>(null);
+  const [hasCompleted, setHasCompleted] = useState(false);
 
-  // Configuração do Player
-  const plyrProps = {
-    source: {
-      type: "video" as const,
-      sources: [
-        {
-          src: videoId,
-          provider: "youtube" as const,
-        },
-      ],
-      // Se tiver poster, adiciona aqui
-      ...(poster && { poster }),
-    },
-    options: {
-      controls: [
-        "play-large",
-        "play",
-        "progress",
-        "current-time",
-        "mute",
-        "volume",
-        "settings",
-        "pip",
-        "airplay",
-        "fullscreen",
-      ],
-      settings: ["quality", "speed", "loop"],
-      youtube: { 
-        noCookie: true, 
-        rel: 0, 
-        showinfo: 0, 
-        iv_load_policy: 3, 
-        modestbranding: 1 
-      },
-      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-    },
-  };
-
-  // Detectar quando o vídeo termina
   useEffect(() => {
-    const player = ref.current?.plyr;
-    
-    if (player) {
-      player.on("ended", () => {
-        console.log("Aula concluída!");
+    if (!playerRef.current) return;
+
+    // Configuração avançada do Plyr com proteções
+    plyrInstance.current = new Plyr(playerRef.current, {
+      controls: [
+        'play-large',
+        'play',
+        'progress',
+        'current-time',
+        'duration',
+        'mute',
+        'volume',
+        'settings',
+        'fullscreen',
+      ],
+      settings: ['quality', 'speed'],
+      quality: {
+        default: 720,
+        options: [1080, 720, 480, 360],
+      },
+      speed: {
+        selected: 1,
+        options: [0.5, 0.75, 1, 1.25, 1.5, 2],
+      },
+      ratio: '16:9',
+      fullscreen: {
+        enabled: true,
+        fallback: true,
+        iosNative: false,
+      },
+      storage: {
+        enabled: true,
+        key: 'plyr_volume',
+      },
+      keyboard: {
+        focused: true,
+        global: false,
+      },
+      tooltips: {
+        controls: true,
+        seek: true,
+      },
+      captions: {
+        active: false,
+        language: 'pt',
+      },
+      // Configurações do YouTube com proteção máxima
+      youtube: {
+        noCookie: true,           // Usa youtube-nocookie.com
+        rel: 0,                   // Desabilita vídeos relacionados
+        showinfo: 0,              // Remove informações do vídeo
+        iv_load_policy: 3,        // Remove anotações
+        modestbranding: 1,        // Remove logo do YouTube
+        playsinline: 1,           // Play inline em mobile
+        controls: 0,              // Remove controles nativos do YouTube
+        disablekb: 1,             // Desabilita atalhos do teclado do YouTube
+        fs: 0,                    // Remove botão de fullscreen do YouTube (usa o do Plyr)
+        enablejsapi: 1,           // Habilita API JavaScript
+        origin: window.location.origin,
+      },
+      // Configurações de autoplay e loop
+      autoplay: false,
+      muted: false,
+      loop: {
+        active: false,
+      },
+      // Configurações de qualidade
+      iconUrl: '',
+      blankVideo: '',
+    });
+
+    const player = plyrInstance.current;
+
+    // Event: Quando o vídeo está pronto
+    player.on('ready', () => {
+      console.log(' Player pronto:', youtubeId);
+    });
+
+    // Event: Atualização de tempo (tracking de progresso)
+    player.on('timeupdate', () => {
+      const percentage = (player.currentTime / player.duration) * 100;
+      
+      if (onProgress) {
+        onProgress(Math.round(percentage));
+      }
+
+      // Marcar como completo quando atingir 90%
+      if (percentage >= 90 && !hasCompleted) {
+        setHasCompleted(true);
+        
+        // Confetti ao completar
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+
+        toast.success('🎉 Parabéns! Aula concluída!', {
+          description: 'Continue assim e domine o jogo!',
+        });
+
         if (onComplete) {
           onComplete();
         }
+      }
+    });
+
+    // Event: Erro no carregamento
+    player.on('error', (event: any) => {
+      console.error('❌ Erro no player:', event);
+      toast.error('Erro ao carregar vídeo', {
+        description: 'Tente recarregar a página.',
       });
-    }
-  }, [onComplete]);
+    });
+
+    // Event: Quando o vídeo termina
+    player.on('ended', () => {
+      if (!hasCompleted) {
+        setHasCompleted(true);
+        if (onComplete) {
+          onComplete();
+        }
+      }
+    });
+
+    // Proteções adicionais
+    // Prevenir clique com botão direito
+    const videoContainer = playerRef.current;
+    const preventContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    videoContainer?.addEventListener('contextmenu', preventContextMenu);
+
+    // Cleanup
+    return () => {
+      videoContainer?.removeEventListener('contextmenu', preventContextMenu);
+      player.destroy();
+    };
+  }, [youtubeId, onProgress, onComplete, hasCompleted]);
 
   return (
-    <Card className="overflow-hidden bg-black aspect-video relative group shadow-2xl border-none ring-1 ring-white/10 rounded-xl">
-      <div className="absolute inset-0 z-10 w-full h-full video-wrapper">
-        <Plyr
-          ref={ref}
-          {...plyrProps}
-          className="w-full h-full"
-        />
-      </div>
+    <div className="relative w-full">
+      {/* Proteção contra download */}
+      <div 
+        className="absolute inset-0 z-10 pointer-events-none"
+        style={{ userSelect: 'none' }}
+      />
       
-      {/* Estilização Customizada do Plyr para combinar com o tema */}
-      <style>{`
-        :root {
-          --plyr-color-main: #e11d48; /* Cor Rose-600 (Tema do site) */
-          --plyr-video-background: #000000;
-          --plyr-menu-background: rgba(20, 20, 20, 0.9);
-          --plyr-menu-color: #ffffff;
-        }
-        
-        .plyr {
-          height: 100%;
-          width: 100%;
-          font-family: inherit;
+      {/* Player Container */}
+      <div
+        ref={playerRef}
+        data-plyr-provider="youtube"
+        data-plyr-embed-id={youtubeId}
+        className="plyr-container"
+        style={{
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          MozUserSelect: 'none',
+          msUserSelect: 'none',
+        }}
+      />
+
+      {/* CSS customizado para Plyr */}
+      <style jsx>{`
+        :global(.plyr) {
+          border-radius: 8px;
+          overflow: hidden;
         }
 
-        .plyr--full-ui input[type=range] {
-          color: var(--plyr-color-main);
+        :global(.plyr__controls) {
+          background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
         }
 
-        .plyr__control--overlaid {
-          background: rgba(225, 29, 72, 0.8);
+        :global(.plyr__control--overlaid) {
+          background: rgba(255, 255, 255, 0.9);
         }
 
-        .plyr__control--overlaid:hover {
-          background: #e11d48;
+        :global(.plyr__control--overlaid:hover) {
+          background: rgba(255, 255, 255, 1);
         }
-        
-        /* Esconder logo do YouTube o máximo possível */
-        .plyr__video-embed iframe {
-          top: -50%;
-          height: 200%;
+
+        :global(.plyr__control--overlaid svg) {
+          fill: #000;
+        }
+
+        /* Prevenir seleção de texto */
+        :global(.plyr *) {
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+        }
+
+        /* Remover logo do YouTube */
+        :global(.plyr__video-embed iframe) {
+          pointer-events: none;
+        }
+
+        /* Customização dos controles */
+        :global(.plyr__control) {
+          color: #fff;
+        }
+
+        :global(.plyr__control:hover) {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        :global(.plyr__progress__buffer) {
+          background: rgba(255, 255, 255, 0.25);
+        }
+
+        :global(.plyr__volume) {
+          max-width: 90px;
+        }
+
+        /* Mobile responsivo */
+        @media (max-width: 768px) {
+          :global(.plyr__volume) {
+            display: none;
+          }
         }
       `}</style>
-    </Card>
+    </div>
   );
-};
+}
