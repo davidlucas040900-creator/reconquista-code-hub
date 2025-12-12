@@ -46,9 +46,13 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
     ratio: '16:9' as const,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleTimeUpdate = (event: any) => {
-    const player = event.detail.plyr;
-    if (player.duration > 0) {
+    // Nota: plyr-react não passa evento direto no onTimeUpdate em algumas versões
+    // Vamos tentar pegar do evento ou usar ref se necessário
+    const player = event?.detail?.plyr;
+    
+    if (player && player.duration > 0) {
       const percentage = (player.currentTime / player.duration) * 100;
 
       // Atualizar a cada 5%
@@ -79,18 +83,45 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
-      <Plyr
-        source={plyrSource}
-        options={plyrOptions}
-        onTimeUpdate={handleTimeUpdate}
-      />
+      <div 
+        onContextMenu={(e) => e.preventDefault()}
+        className="h-full w-full"
+      >
+        <Plyr
+          source={plyrSource}
+          options={plyrOptions}
+        />
+        {/* Hack para capturar eventos já que onTimeUpdate pode não disparar no wrapper */}
+        <EventListenerHook onTimeUpdate={handleTimeUpdate} />
+      </div>
 
       <style>{`
         :root {
           --plyr-color-main: #FFD700;
           --plyr-video-control-background-hover: #E50914;
         }
+        .plyr__video-embed iframe {
+          pointer-events: none;
+        }
       `}</style>
     </div>
   );
+}
+
+// Hook para anexar listeners ao player quando ele montar
+function EventListenerHook({ onTimeUpdate }: { onTimeUpdate: (e: any) => void }) {
+  const [mounted, setMounted] = useState(false);
+
+  if (!mounted) {
+    // Pequeno delay para garantir que o Plyr montou
+    setTimeout(() => {
+      const playerElement = document.querySelector('.plyr');
+      if (playerElement) {
+        playerElement.addEventListener('timeupdate', (e) => onTimeUpdate(e));
+        setMounted(true);
+      }
+    }, 1000);
+  }
+  
+  return null;
 }
