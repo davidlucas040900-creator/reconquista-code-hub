@@ -331,4 +331,419 @@ export default function AdminCursoDetalhe() {
 
       if (error) {
         toast.error('Erro ao criar aula');
-      } else 
+      } else {
+        toast.success('Aula criada');
+        setIsLessonDialogOpen(false);
+        fetchModules();
+      }
+    }
+
+    setSaving(false);
+  };
+
+  const handleDeleteLesson = async () => {
+    if (!deleteLessonId) return;
+
+    const { error } = await supabase
+      .from('course_lessons')
+      .delete()
+      .eq('id', deleteLessonId);
+
+    if (error) {
+      toast.error('Erro ao excluir aula');
+    } else {
+      toast.success('Aula excluída');
+      setDeleteLessonId(null);
+      fetchModules();
+    }
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout title="Carregando...">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout
+      title={course?.name || 'Curso'}
+      breadcrumb={[
+        { label: 'Cursos', href: '/admin/cursos' },
+        { label: course?.name || 'Curso' },
+      ]}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-muted-foreground">
+          {modules.length} {modules.length === 1 ? 'módulo' : 'módulos'}
+        </p>
+        <Button onClick={openCreateModule}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Módulo
+        </Button>
+      </div>
+
+      {/* Modules List */}
+      {modules.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground mb-4">Nenhum módulo criado ainda.</p>
+          <Button onClick={openCreateModule}>
+            <Plus className="h-4 w-4 mr-2" />
+            Criar Primeiro Módulo
+          </Button>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {modules.map((mod, modIndex) => (
+            <Card key={mod.id} className="overflow-hidden">
+              <Collapsible
+                open={expandedModules.has(mod.id)}
+                onOpenChange={() => toggleModule(mod.id)}
+              >
+                {/* Module Header */}
+                <div className="flex items-center gap-3 p-4">
+                  <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+
+                  <CollapsibleTrigger className="flex items-center gap-2 flex-1 text-left">
+                    {expandedModules.has(mod.id) ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Módulo {modIndex + 1}
+                        </span>
+                        {!mod.is_active && (
+                          <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
+                            Inativo
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-medium text-foreground">{mod.name}</h3>
+                    </div>
+                  </CollapsibleTrigger>
+
+                  <span className="text-sm text-muted-foreground">
+                    {lessons[mod.id]?.length || 0} aulas
+                  </span>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditModule(mod);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteModuleId(mod.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+
+                {/* Lessons List */}
+                <CollapsibleContent>
+                  <div className="border-t border-border bg-muted/30 p-4 space-y-2">
+                    {(lessons[mod.id] || []).map((lesson, lessonIndex) => (
+                      <div
+                        key={lesson.id}
+                        className="flex items-center gap-3 p-3 bg-background rounded-md border border-border"
+                      >
+                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+
+                        <PlayCircle className="h-4 w-4 text-muted-foreground" />
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              {modIndex + 1}.{lessonIndex + 1}
+                            </span>
+                            <span className="font-medium text-sm text-foreground truncate">
+                              {lesson.title}
+                            </span>
+                            {lesson.is_bonus && (
+                              <span className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1.5 py-0.5 rounded">
+                                Bônus
+                              </span>
+                            )}
+                            {lesson.is_free && (
+                              <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">
+                                Grátis
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {lesson.duration_minutes && (
+                          <span className="text-xs text-muted-foreground">
+                            {lesson.duration_minutes} min
+                          </span>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditLesson(lesson)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteLessonId(lesson.id)}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => openCreateLesson(mod.id)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar Aula
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Module Dialog */}
+      <Dialog open={isModuleDialogOpen} onOpenChange={setIsModuleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedModule ? 'Editar Módulo' : 'Novo Módulo'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mod-name">Nome do Módulo *</Label>
+              <Input
+                id="mod-name"
+                value={moduleForm.name}
+                onChange={(e) =>
+                  setModuleForm({
+                    ...moduleForm,
+                    name: e.target.value,
+                    slug: generateSlug(e.target.value),
+                  })
+                }
+                placeholder="Ex: Reset Emocional"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mod-description">Descrição</Label>
+              <Textarea
+                id="mod-description"
+                value={moduleForm.description}
+                onChange={(e) =>
+                  setModuleForm({ ...moduleForm, description: e.target.value })
+                }
+                placeholder="Descrição do módulo..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="mod-active">Módulo Ativo</Label>
+              <Switch
+                id="mod-active"
+                checked={moduleForm.is_active}
+                onCheckedChange={(checked) =>
+                  setModuleForm({ ...moduleForm, is_active: checked })
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModuleDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveModule} disabled={saving}>
+              {saving ? 'Salvando...' : selectedModule ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lesson Dialog */}
+      <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedLesson ? 'Editar Aula' : 'Nova Aula'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="lesson-title">Título da Aula *</Label>
+              <Input
+                id="lesson-title"
+                value={lessonForm.title}
+                onChange={(e) =>
+                  setLessonForm({ ...lessonForm, title: e.target.value })
+                }
+                placeholder="Ex: Os Homens Sempre Voltam"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lesson-description">Descrição</Label>
+              <Textarea
+                id="lesson-description"
+                value={lessonForm.description}
+                onChange={(e) =>
+                  setLessonForm({ ...lessonForm, description: e.target.value })
+                }
+                placeholder="Descrição da aula..."
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lesson-video">ID do Vídeo (YouTube)</Label>
+              <Input
+                id="lesson-video"
+                value={lessonForm.video_url}
+                onChange={(e) =>
+                  setLessonForm({ ...lessonForm, video_url: e.target.value })
+                }
+                placeholder="Ex: dQw4w9WgXcQ"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cole apenas o ID do vídeo do YouTube (a parte depois de v=)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lesson-duration">Duração (minutos)</Label>
+              <Input
+                id="lesson-duration"
+                type="number"
+                value={lessonForm.duration_minutes}
+                onChange={(e) =>
+                  setLessonForm({
+                    ...lessonForm,
+                    duration_minutes: Number(e.target.value),
+                  })
+                }
+                placeholder="10"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="lesson-free">Aula Gratuita</Label>
+              <Switch
+                id="lesson-free"
+                checked={lessonForm.is_free}
+                onCheckedChange={(checked) =>
+                  setLessonForm({ ...lessonForm, is_free: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="lesson-bonus">Aula Bônus</Label>
+              <Switch
+                id="lesson-bonus"
+                checked={lessonForm.is_bonus}
+                onCheckedChange={(checked) =>
+                  setLessonForm({ ...lessonForm, is_bonus: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="lesson-active">Aula Ativa</Label>
+              <Switch
+                id="lesson-active"
+                checked={lessonForm.is_active}
+                onCheckedChange={(checked) =>
+                  setLessonForm({ ...lessonForm, is_active: checked })
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLessonDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveLesson} disabled={saving}>
+              {saving ? 'Salvando...' : selectedLesson ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Module Confirmation */}
+      <AlertDialog open={!!deleteModuleId} onOpenChange={() => setDeleteModuleId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir módulo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todas as aulas deste módulo também serão excluídas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteModule}
+              className="bg-destructive text-destructive-foreground"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Lesson Confirmation */}
+      <AlertDialog open={!!deleteLessonId} onOpenChange={() => setDeleteLessonId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir aula?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLesson}
+              className="bg-destructive text-destructive-foreground"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AdminLayout>
+  );
+}
