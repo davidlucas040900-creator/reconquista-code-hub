@@ -32,7 +32,6 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
       'mute',
       'volume',
       'settings',
-      'pip',
       'fullscreen',
     ],
     settings: ['quality', 'speed'],
@@ -42,36 +41,37 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
       showinfo: 0,
       iv_load_policy: 3,
       modestbranding: 1,
+      controls: 0,
+      disablekb: 1,
+      fs: 0,
+      playsinline: 1,
+      cc_load_policy: 0,
+      autoplay: 0,
     },
     ratio: '16:9' as const,
+    hideControls: false,
+    resetOnEnd: false,
+    keyboard: { focused: true, global: false },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleTimeUpdate = (event: any) => {
-    // Nota: plyr-react não passa evento direto no onTimeUpdate em algumas versões
-    // Vamos tentar pegar do evento ou usar ref se necessário
-    const player = event?.detail?.plyr;
-    
-    if (player && player.duration > 0) {
+    const player = event.detail.plyr;
+    if (player.duration > 0) {
       const percentage = (player.currentTime / player.duration) * 100;
 
-      // Atualizar a cada 5%
       if (percentage % 5 < 0.5) {
         onProgress?.(Math.round(percentage));
       }
 
-      // Celebração aos 90%
       if (percentage >= 90 && !hasCompleted) {
         setHasCompleted(true);
 
-        // Confetti
         confetti({
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 }
         });
 
-        // Toast
         toast.success(' Parabéns!', {
           description: 'Concluíste esta aula com sucesso!',
         });
@@ -82,46 +82,62 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
   };
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
-      <div 
-        onContextMenu={(e) => e.preventDefault()}
-        className="h-full w-full"
-      >
-        <Plyr
-          source={plyrSource}
-          options={plyrOptions}
-        />
-        {/* Hack para capturar eventos já que onTimeUpdate pode não disparar no wrapper */}
-        <EventListenerHook onTimeUpdate={handleTimeUpdate} />
-      </div>
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl plyr-wrapper">
+      <Plyr
+        source={plyrSource}
+        options={plyrOptions}
+        onTimeUpdate={handleTimeUpdate}
+      />
 
       <style>{`
+        /* Cores customizadas do Plyr */
         :root {
           --plyr-color-main: #FFD700;
           --plyr-video-control-background-hover: #E50914;
         }
+
+        /* ESCONDER ELEMENTOS DO YOUTUBE */
+        .plyr-wrapper .ytp-title,
+        .plyr-wrapper .ytp-chrome-top,
+        .plyr-wrapper .ytp-show-cards-title,
+        .plyr-wrapper .ytp-watermark,
+        .plyr-wrapper .ytp-gradient-top,
+        .plyr-wrapper .ytp-gradient-bottom,
+        .plyr-wrapper .ytp-pause-overlay,
+        .plyr-wrapper .ytp-endscreen-content,
+        .plyr-wrapper .ytp-cards-teaser,
+        .plyr-wrapper .iv-branding,
+        .plyr-wrapper .ytp-ce-element {
+          display: none !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+        }
+
+        /* Forçar z-index dos controles do Plyr */
+        .plyr__controls {
+          z-index: 9999 !important;
+        }
+
+        /* Esconder overlay de pausa do YouTube */
         .plyr__video-embed iframe {
           pointer-events: none;
+        }
+
+        .plyr__video-embed:hover iframe {
+          pointer-events: auto;
+        }
+
+        /* Remover qualquer overlay */
+        .plyr__poster {
+          z-index: 1;
+        }
+
+        .plyr--playing .ytp-gradient-top,
+        .plyr--playing .ytp-chrome-top {
+          opacity: 0 !important;
         }
       `}</style>
     </div>
   );
-}
-
-// Hook para anexar listeners ao player quando ele montar
-function EventListenerHook({ onTimeUpdate }: { onTimeUpdate: (e: any) => void }) {
-  const [mounted, setMounted] = useState(false);
-
-  if (!mounted) {
-    // Pequeno delay para garantir que o Plyr montou
-    setTimeout(() => {
-      const playerElement = document.querySelector('.plyr');
-      if (playerElement) {
-        playerElement.addEventListener('timeupdate', (e) => onTimeUpdate(e));
-        setMounted(true);
-      }
-    }, 1000);
-  }
-  
-  return null;
 }
