@@ -1,293 +1,367 @@
+// src/pages/Dashboard.tsx - VERSÃO MINIMALISTA
+
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { getModulesConfig } from '@/data/modulesConfig';
-import { getTotalLessons } from '@/data/lessons';
-import { ModuleCard } from '@/components/ModuleCard';
-import { WeeklyChallengeCard } from '@/components/WeeklyChallengeCard';
-import { UpsellCarousel } from '@/components/UpsellCarousel';
-import { PremiumUpsell } from '@/components/PremiumUpsell';
-import { BonusCarousel } from '@/components/BonusCarousel';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Button } from '@/components/ui/button';
-import { LogOut, Award, TrendingUp, Lock, User, Users } from 'lucide-react';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { WelcomeModal } from '@/components/WelcomeModal';
-import { ValueBreakdownCard } from '@/components/ValueBreakdownCard';
-import { NotificationPrompt } from '@/components/NotificationPrompt';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { 
+  LogOut, 
+  PlayCircle, 
+  BookOpen, 
+  ChevronRight,
+  User,
+  Loader2
+} from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
-const Dashboard = () => {
-  const { user, loading, signOut } = useAuth();
+interface Course {
+  id: string;
+  name: string;
+  slug: string;
+  thumbnail: string | null;
+  totalLessons: number;
+  completedLessons: number;
+}
+
+interface ContinueWatching {
+  lessonId: string;
+  lessonTitle: string;
+  moduleName: string;
+  courseSlug: string;
+  progress: number;
+}
+
+export default function Dashboard() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
+  
   const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
-  const [userStats, setUserStats] = useState({
-    globalProgress: 0,
-    achievements: 0,
-    streak: 1,
-  });
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [continueWatching, setContinueWatching] = useState<ContinueWatching | null>(null);
+  const [totalProgress, setTotalProgress] = useState({ completed: 0, total: 0 });
+  const [loading, setLoading] = useState(true);
 
-  // ═══════════════════════════════════════════════════════════
-  // AUTENTICAÇÃO
-  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate('/login');
     }
-  }, [user, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
-  // ═══════════════════════════════════════════════════════════
-  // CARREGAR PERFIL
-  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-
-        setProfile(data);
-      }
-    };
-
-    fetchProfile();
+    if (user) {
+      fetchData();
+    }
   }, [user]);
 
-  // ═══════════════════════════════════════════════════════════
-  // CARREGAR ESTATÍSTICAS
-  // ═══════════════════════════════════════════════════════════
-  useEffect(() => {
-    const fetchUserStats = async () => {
-      if (user) {
-        const { data: stats } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+  const fetchData = async () => {
+    if (!user) return;
 
-        if (stats) {
-          const totalLessons = getTotalLessons();
-          const globalProgress = Math.round((stats.lessons_completed / totalLessons) * 100);
+    // Buscar perfil
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+    
+    setProfile(profileData);
 
-          setUserStats({
-            globalProgress,
-            achievements: stats.lessons_completed,
-            streak: stats.current_streak_days || 1,
-          });
-        }
-      }
-    };
+    // Buscar cursos com acesso
+    const { data: coursesData } = await supabase
+      .from('courses')
+      .select('id, name, slug, thumbnail')
+      .eq('is_active', true)
+      .order('order_index');
 
-    fetchUserStats();
-  }, [user]);
+    if (coursesData) {
+      // Para cada curso, buscar progresso
+      const coursesWithProgress = await Promise.all(
+        coursesData.map(async (course) => {
+          // Total de aulas do curso
+          const { data: modules } = await supabase
+            .from('course_modules')
+            .select('id')
+            .eq('course_id', course.id);
+          
+          let totalLessons = 0;
+          let completedLessons = 0;
 
-  // ═══════════════════════════════════════════════════════════
-  // HANDLER: CLICK NO MÓDULO (SIMPLIFICADO - SEM VERIFICAÇÃO)
-  // ═══════════════════════════════════════════════════════════
-  const handleModuleClick = (moduleNumber: number) => {
-    console.log(`✅ [Dashboard] Navegando para módulo ${moduleNumber}`);
-    navigate(`/modulo/${moduleNumber}/aula/1`);
+          if (modules && modules.length > 0) {
+            const moduleIds = modules.map(m => m.id);
+            
+            const { count: total } = await supabase
+              .from('course_lessons')
+              .select('*', { count: 'exact', head: true })
+              .in('module_id', moduleIds)
+              .eq('is_active', true);
+            
+            totalLessons = total || 0;
+
+            // Aulas completadas pelo usuário
+            const { data: lessons } = await supabase
+              .from('course_lessons')
+              .select('id')
+              .in('module_id', moduleIds);
+
+            if (lessons && lessons.length > 0) {
+              const lessonIds = lessons.map(l => l.id);
+              
+              const { count: completed } = await supabase
+                .from('user_lesson_progress')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .in('lesson_id', lessonIds)
+                .eq('is_completed', true);
+              
+              completedLessons = completed || 0;
+            }
+          }
+
+          return {
+            ...course,
+            totalLessons,
+            completedLessons,
+          };
+        })
+      );
+
+      setCourses(coursesWithProgress);
+
+      // Calcular progresso total
+      const totalAll = coursesWithProgress.reduce((acc, c) => acc + c.totalLessons, 0);
+      const completedAll = coursesWithProgress.reduce((acc, c) => acc + c.completedLessons, 0);
+      setTotalProgress({ completed: completedAll, total: totalAll });
+    }
+
+    // Buscar última aula assistida (continue watching)
+    const { data: lastProgress } = await supabase
+      .from('user_lesson_progress')
+      .select(`
+        lesson_id,
+        watch_percentage,
+        course_lessons:lesson_id (
+          id,
+          title,
+          course_modules:module_id (
+            name,
+            courses:course_id (slug)
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_completed', false)
+      .order('last_watched_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastProgress?.course_lessons) {
+      const lesson = lastProgress.course_lessons as any;
+      setContinueWatching({
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        moduleName: lesson.course_modules?.name || '',
+        courseSlug: lesson.course_modules?.courses?.slug || '',
+        progress: lastProgress.watch_percentage || 0,
+      });
+    }
+
+    setLoading(false);
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // HANDLER: LOGOUT
-  // ═══════════════════════════════════════════════════════════
   const handleLogout = async () => {
     await signOut();
-    toast.success('Até breve! 👋');
     navigate('/login');
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // LOADING STATE
-  // ═══════════════════════════════════════════════════════════
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-b-4 border-primary"></div>
-          <p className="text-muted-foreground">A carregar...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!user) return null;
 
-  // ═══════════════════════════════════════════════════════════
-  // MÓDULOS (TODOS LIBERADOS)
-  // ═══════════════════════════════════════════════════════════
-  const modulesConfig = getModulesConfig();
+  const firstName = profile?.full_name?.split(' ')[0] || 'Aluna';
+  const progressPercent = totalProgress.total > 0 
+    ? Math.round((totalProgress.completed / totalProgress.total) * 100) 
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
-      <WelcomeModal />
-
-      {/* Top Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-lg">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="flex h-14 items-center justify-between">
+            <Link to="/dashboard" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background text-sm font-bold">
                 CR
               </div>
-              <span className="hidden text-lg font-bold sm:inline">Código da Reconquista</span>
-            </div>
+            </Link>
 
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/comunidade')}
-                className="gap-2"
-              >
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Comunidade</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/meu-plano')}
-                className="gap-2"
-              >
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">Meu Plano</span>
-              </Button>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                size="sm"
-                className="gap-2 transition-all hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
-              >
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sair</span>
               </Button>
             </div>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="mx-auto max-w-7xl space-y-12 px-4 py-8 sm:px-6 lg:px-8">
-        {/* Notification Prompt */}
-        <div className="mb-6">
-          <NotificationPrompt />
-        </div>
-
-        {/* Welcome Banner */}
-        <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-secondary/10 to-background p-8 md:p-12">
-          <div className="relative z-10 max-w-3xl">
-            <div className="mb-8">
-              <ValueBreakdownCard />
-            </div>
-
-            <div className="mb-6 flex justify-center md:justify-start">
-              <img
-                src="https://pub-335435355c6548d7987945a540eca66b.r2.dev/LOGO%20NA%20PAGINA%20INICIAL%20DA%20AREA%20DE%20MEMBRO.webp"
-                alt="Código da Reconquista"
-                className="h-auto max-w-[220px]"
-              />
-            </div>
-            <h1 className="mb-3 text-3xl font-bold text-foreground md:text-4xl">
-              Bem-vinda à tua virada de jogo,{' '}
-              <span className="text-gradient-gold">
-                {profile?.full_name || user?.email?.split('@')[0] || 'Aluna'}
-              </span>
-              !
-            </h1>
-            <p className="mb-6 text-lg text-muted-foreground">
-              Estás pronta para dominar a arte da reconquista? A tua jornada começa agora.
-            </p>
-
-            {/* Progress Stats */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-lg border border-border bg-background/50 p-4 backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/20 p-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Progresso Global</p>
-                    <p className="text-xl font-bold text-foreground">{userStats.globalProgress}%</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background/50 p-4 backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-secondary/20 p-2">
-                    <Award className="h-5 w-5 text-secondary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Aulas Completas</p>
-                    <p className="text-xl font-bold text-foreground">
-                      {userStats.achievements}/{getTotalLessons()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background/50 p-4 backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/20 p-2">
-                    <span className="text-xl">🔥</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Streak</p>
-                    <p className="text-xl font-bold text-foreground">
-                      {userStats.streak} {userStats.streak === 1 ? 'dia' : 'dias'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-secondary/10 blur-3xl" />
-        </section>
-
-        {/* Weekly Challenge */}
-        <WeeklyChallengeCard />
-
-        {/* Main Course Carousel */}
-        <section className="space-y-6">
+      {/* Main Content */}
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <div className="space-y-8">
+          {/* Welcome */}
           <div>
-            <h2 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">
-              O Código da Reconquista: A Jornada Completa
-            </h2>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Olá, {firstName}
+            </h1>
             <p className="text-muted-foreground">
-              {modulesConfig.length} módulos transformadores • Todos liberados! 🎉
+              Vamos continuar sua jornada?
             </p>
           </div>
 
-          <div className="relative">
-            <div className="scrollbar-hide flex snap-x snap-mandatory gap-6 overflow-x-auto pb-6">
-              {modulesConfig.map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  isReleased={true}
-                  onClick={() => handleModuleClick(module.number)}
-                />
-              ))}
+          {/* Continue Watching */}
+          {continueWatching && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Continuar assistindo
+                  </p>
+                  <h3 className="font-medium text-foreground truncate">
+                    {continueWatching.lessonTitle}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {continueWatching.moduleName}
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => navigate(`/aula/${continueWatching.lessonId}`)}
+                >
+                  Retomar
+                </Button>
+              </div>
+              {continueWatching.progress > 0 && (
+                <Progress value={continueWatching.progress} className="h-1 mt-4" />
+              )}
+            </Card>
+          )}
+
+          {/* Overall Progress */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Seu progresso</span>
+              <span className="text-sm font-medium text-foreground">
+                {totalProgress.completed} de {totalProgress.total}
+              </span>
             </div>
+            <Progress value={progressPercent} className="h-2" />
           </div>
-        </section>
 
-        {/* Recomendado Para Você */}
-        <UpsellCarousel />
+          {/* Courses */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Seus cursos
+            </h2>
 
-        {/* Seção Premium: A Deusa na Cama */}
-        <PremiumUpsell />
+            {courses.length === 0 ? (
+              <Card className="p-8 text-center">
+                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  Nenhum curso disponível ainda.
+                </p>
+              </Card>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {courses.map((course) => {
+                  const courseProgress = course.totalLessons > 0
+                    ? Math.round((course.completedLessons / course.totalLessons) * 100)
+                    : 0;
 
-        {/* O Teu Arsenal Secreto */}
-        <BonusCarousel />
-      </div>
+                  return (
+                    <Card
+                      key={course.id}
+                      className="overflow-hidden cursor-pointer transition-colors hover:bg-accent/50"
+                      onClick={() => navigate(`/curso/${course.slug}`)}
+                    >
+                      {/* Thumbnail */}
+                      <div className="aspect-video bg-muted">
+                        {course.thumbnail ? (
+                          <img
+                            src={course.thumbnail}
+                            alt={course.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <BookOpen className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="p-4">
+                        <h3 className="font-medium text-foreground mb-1">
+                          {course.name}
+                        </h3>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                          <span>{course.totalLessons} aulas</span>
+                          <span>{courseProgress}%</span>
+                        </div>
+                        <Progress value={courseProgress} className="h-1" />
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Links */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Card 
+              className="p-4 cursor-pointer transition-colors hover:bg-accent/50"
+              onClick={() => navigate('/cursos')}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-md bg-accent p-2">
+                    <PlayCircle className="h-5 w-5 text-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Todos os cursos</p>
+                    <p className="text-sm text-muted-foreground">Ver catálogo completo</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </Card>
+
+            <Card 
+              className="p-4 cursor-pointer transition-colors hover:bg-accent/50"
+              onClick={() => navigate('/admin')}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-md bg-accent p-2">
+                    <User className="h-5 w-5 text-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Minha conta</p>
+                    <p className="text-sm text-muted-foreground">Perfil e configurações</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </main>
     </div>
   );
-};
-
-export default Dashboard;
+}
