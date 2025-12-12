@@ -58,7 +58,7 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
 
     // Event listeners
     player.on('ready', () => {
-      console.log('✅ Plyr inicializado para:', youtubeId);
+      console.log(' Plyr inicializado para:', youtubeId);
     });
 
     player.on('timeupdate', () => {
@@ -107,32 +107,8 @@ export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerPr
       <div
         ref={containerRef}
         className="plyr-container w-full"
-        style={{ userSelect: 'none' }}
         onContextMenu={(e) => e.preventDefault()}
       />
-      
-      <style jsx>{`
-        :global(.plyr) {
-          border-radius: 8px;
-          overflow: hidden;
-        }
-
-        :global(.plyr__controls) {
-          background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-        }
-
-        :global(.plyr__control--overlaid) {
-          background: rgba(255, 255, 255, 0.9);
-        }
-
-        :global(.plyr__control--overlaid:hover) {
-          background: rgba(255, 255, 255, 1);
-        }
-
-        :global(.plyr *) {
-          user-select: none;
-        }
-      `}</style>
     </div>
   );
 }

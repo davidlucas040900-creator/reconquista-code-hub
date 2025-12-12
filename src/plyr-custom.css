@@ -1,0 +1,58 @@
+﻿/* Plyr Customizações */
+.plyr {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.plyr__controls {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.plyr__control--overlaid {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.plyr__control--overlaid:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+.plyr__control--overlaid svg {
+  fill: #000;
+}
+
+.plyr * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.plyr__video-embed iframe {
+  pointer-events: auto;
+}
+
+.plyr__control {
+  color: #fff;
+}
+
+.plyr__control:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.plyr__progress__buffer {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.plyr__volume {
+  max-width: 90px;
+}
+
+@media (max-width: 768px) {
+  .plyr__volume {
+    display: none;
+  }
+}
+
+/* Proteção extra */
+.plyr-container {
+  position: relative;
+  user-select: none;
+}
