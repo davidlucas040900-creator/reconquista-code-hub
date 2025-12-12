@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx - VERSÃO MINIMALISTA
+﻿// src/pages/Dashboard.tsx - VERSÃƒO MINIMALISTA
 
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -99,7 +99,7 @@ export default function Dashboard() {
             
             totalLessons = total || 0;
 
-            // Aulas completadas pelo usuário
+            // Aulas completadas pelo usuÃ¡rio
             const { data: lessons } = await supabase
               .from('course_lessons')
               .select('id')
@@ -135,7 +135,7 @@ export default function Dashboard() {
       setTotalProgress({ completed: completedAll, total: totalAll });
     }
 
-    // Buscar última aula assistida (continue watching)
+    // Buscar Ãºltima aula assistida (continue watching)
     const { data: lastProgress } = await supabase
       .from('user_lesson_progress')
       .select(`
@@ -156,14 +156,14 @@ export default function Dashboard() {
       .limit(1)
       .single();
 
-    if (lastProgress?.course_lessons) {
-      const lesson = lastProgress.course_lessons as any;
+    if ((lastProgress as any)?.course_lessons) {
+      const lesson = (lastProgress as any).course_lessons;
       setContinueWatching({
         lessonId: lesson.id,
         lessonTitle: lesson.title,
         moduleName: lesson.course_modules?.name || '',
         courseSlug: lesson.course_modules?.courses?.slug || '',
-        progress: lastProgress.watch_percentage || 0,
+        progress: (lastProgress as any).watch_percentage || 0,
       });
     }
 
@@ -218,7 +218,7 @@ export default function Dashboard() {
           {/* Welcome */}
           <div>
             <h1 className="text-2xl font-semibold text-foreground">
-              Olá, {firstName}
+              OlÃ¡, {firstName}
             </h1>
             <p className="text-muted-foreground">
               Vamos continuar sua jornada?
@@ -273,7 +273,7 @@ export default function Dashboard() {
               <Card className="p-8 text-center">
                 <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">
-                  Nenhum curso disponível ainda.
+                  Nenhum curso disponÃ­vel ainda.
                 </p>
               </Card>
             ) : (
@@ -335,7 +335,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Todos os cursos</p>
-                    <p className="text-sm text-muted-foreground">Ver catálogo completo</p>
+                    <p className="text-sm text-muted-foreground">Ver catÃ¡logo completo</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -353,7 +353,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Minha conta</p>
-                    <p className="text-sm text-muted-foreground">Perfil e configurações</p>
+                    <p className="text-sm text-muted-foreground">Perfil e configuraÃ§Ãµes</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -365,3 +365,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
