@@ -1,17 +1,16 @@
-﻿// src/pages/Aula.tsx
+// src/pages/Aula.tsx
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { VideoPlayer } from '@/components/VideoPlayer'; // IMPORTAR VIDEOPLAYER
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  CheckCircle2, 
   Circle,
   PlayCircle,
   Loader2,
@@ -187,23 +186,7 @@ export default function Aula() {
     setLoading(false);
   };
 
-  const handleProgress = async (percentage: number) => {
-    setWatchProgress(percentage);
-    
-    if (!user || !lessonId) return;
-
-    // Atualizar progresso no banco
-    await supabase.from('user_lesson_progress').upsert({
-      user_id: user.id,
-      lesson_id: lessonId,
-      watch_percentage: percentage,
-      last_watched_at: new Date().toISOString(),
-    }, {
-      onConflict: 'user_id,lesson_id'
-    });
-  };
-
-  const handleComplete = async () => {
+  const markAsComplete = async () => {
     if (!user || !lessonId) return;
 
     await supabase.from('user_lesson_progress').upsert({
@@ -218,28 +201,17 @@ export default function Aula() {
     });
 
     setIsCompleted(true);
-    toast.success(' Aula concluída!');
+    toast.success('Aula marcada como concluída!');
 
     // Atualizar sidebar
-    setSidebarModules(prev =>
+    setSidebarModules(prev => 
       prev.map(mod => ({
         ...mod,
-        lessons: mod.lessons.map(l =>
+        lessons: mod.lessons.map(l => 
           l.id === lessonId ? { ...l, is_completed: true } : l
         ),
       }))
     );
-
-    // Navegar para próxima se existir
-    if (nextLesson) {
-      setTimeout(() => {
-        navigate(`/aula/${nextLesson}`);
-      }, 2000);
-    }
-  };
-
-  const markAsComplete = async () => {
-    await handleComplete();
   };
 
   if (authLoading || loading) {
@@ -268,8 +240,8 @@ export default function Aula() {
               </div>
             </div>
 
-            <Button
-              variant="ghost"
+            <Button 
+              variant="ghost" 
               size="icon"
               className="lg:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -284,18 +256,21 @@ export default function Aula() {
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            {/* SUBSTITUÍDO: USAR VIDEOPLAYER COM PLYR */}
-            {lesson?.video_url ? (
-              <VideoPlayer
-                youtubeId={lesson.video_url}
-                onProgress={handleProgress}
-                onComplete={handleComplete}
-              />
-            ) : (
-              <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
-                <p className="text-white/50">Vídeo não disponível</p>
-              </div>
-            )}
+            {/* Video Player */}
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              {lesson?.video_url ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${lesson.video_url}?rel=0`}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <p className="text-white/50">Vídeo não disponível</p>
+                </div>
+              )}
+            </div>
 
             {/* Lesson Info */}
             <div>
@@ -330,15 +305,6 @@ export default function Aula() {
               {lesson?.description && (
                 <p className="text-muted-foreground">{lesson.description}</p>
               )}
-
-              {/* Progress Bar */}
-              <div className="mt-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Progresso da aula</span>
-                  <span className="text-foreground font-medium">{watchProgress}%</span>
-                </div>
-                <Progress value={watchProgress} className="h-2" />
-              </div>
             </div>
 
             {/* Navigation */}
@@ -392,8 +358,8 @@ export default function Aula() {
                         }}
                         className={`
                           w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors
-                          ${sideLesson.id === lessonId
-                            ? 'bg-accent text-accent-foreground'
+                          ${sideLesson.id === lessonId 
+                            ? 'bg-accent text-accent-foreground' 
                             : 'hover:bg-accent/50 text-muted-foreground'
                           }
                         `}
@@ -418,7 +384,7 @@ export default function Aula() {
 
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
-        <div
+        <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
