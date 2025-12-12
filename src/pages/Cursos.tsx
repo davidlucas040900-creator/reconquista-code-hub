@@ -1,7 +1,11 @@
 // src/pages/Cursos.tsx
 
 import { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { useNavigate, Link } from 'react-router-dom';
+=======
+import { useNavigate } from 'react-router-dom';
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -15,8 +19,11 @@ interface Course {
   slug: string;
   description: string | null;
   thumbnail: string | null;
+<<<<<<< HEAD
   totalLessons: number;
   completedLessons: number;
+=======
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 }
 
 export default function Cursos() {
@@ -38,14 +45,19 @@ export default function Cursos() {
   }, [user]);
 
   const fetchCourses = async () => {
+<<<<<<< HEAD
     if (!user) return;
 
     const { data: coursesData } = await supabase
+=======
+    const { data } = await supabase
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       .from('courses')
       .select('id, name, slug, description, thumbnail')
       .eq('is_active', true)
       .order('order_index');
 
+<<<<<<< HEAD
     if (coursesData) {
       const coursesWithProgress = await Promise.all(
         coursesData.map(async (course) => {
@@ -98,6 +110,9 @@ export default function Cursos() {
       setCourses(coursesWithProgress);
     }
 
+=======
+    setCourses(data || []);
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
     setLoading(false);
   };
 
@@ -111,7 +126,10 @@ export default function Cursos() {
 
   return (
     <div className="min-h-screen bg-background">
+<<<<<<< HEAD
       {/* Header */}
+=======
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4">
           <div className="flex h-14 items-center gap-4">
@@ -123,7 +141,10 @@ export default function Cursos() {
         </div>
       </header>
 
+<<<<<<< HEAD
       {/* Content */}
+=======
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       <main className="mx-auto max-w-5xl px-4 py-8">
         {courses.length === 0 ? (
           <Card className="p-8 text-center">
@@ -132,6 +153,7 @@ export default function Cursos() {
           </Card>
         ) : (
           <div className="space-y-4">
+<<<<<<< HEAD
             {courses.map((course) => {
               const progress = course.totalLessons > 0
                 ? Math.round((course.completedLessons / course.totalLessons) * 100)
@@ -179,9 +201,40 @@ export default function Cursos() {
                 </Card>
               );
             })}
+=======
+            {courses.map((course) => (
+              <Card
+                key={course.id}
+                className="overflow-hidden cursor-pointer transition-colors hover:bg-accent/50"
+                onClick={() => navigate(`/curso/${course.slug}`)}
+              >
+                <div className="flex flex-col sm:flex-row">
+                  <div className="sm:w-48 aspect-video sm:aspect-auto bg-muted flex-shrink-0">
+                    {course.thumbnail ? (
+                      <img src={course.thumbnail} alt={course.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center min-h-[120px]">
+                        <BookOpen className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 p-4">
+                    <h2 className="font-semibold text-foreground mb-1">{course.name}</h2>
+                    {course.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{course.description}</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
           </div>
         )}
       </main>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+<<<<<<< HEAD
 import { Progress } from '@/components/ui/progress';
 import { 
   ChevronLeft, 
@@ -27,10 +28,15 @@ interface Course {
   name: string;
   description: string | null;
 }
+=======
+import { ChevronLeft, ChevronDown, ChevronRight, PlayCircle, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 
 interface Module {
   id: string;
   name: string;
+<<<<<<< HEAD
   order_index: number;
   lessons: Lesson[];
   completedCount: number;
@@ -43,14 +49,21 @@ interface Lesson {
   is_bonus: boolean;
   is_completed: boolean;
   order_index: number;
+=======
+  lessons: { id: string; title: string; is_bonus: boolean }[];
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
 }
 
 export default function CursoDetalhe() {
   const { courseSlug } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+<<<<<<< HEAD
 
   const [course, setCourse] = useState<Course | null>(null);
+=======
+  const [courseName, setCourseName] = useState('');
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
   const [modules, setModules] = useState<Module[]>([]);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -68,6 +81,7 @@ export default function CursoDetalhe() {
   }, [user, courseSlug]);
 
   const fetchCourse = async () => {
+<<<<<<< HEAD
     if (!user) return;
 
     // Buscar curso
@@ -79,10 +93,20 @@ export default function CursoDetalhe() {
       .single();
 
     if (!courseData) {
+=======
+    const { data: course } = await supabase
+      .from('courses')
+      .select('id, name')
+      .eq('slug', courseSlug)
+      .single();
+
+    if (!course) {
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       navigate('/cursos');
       return;
     }
 
+<<<<<<< HEAD
     setCourse(courseData);
 
     // Buscar módulos
@@ -90,10 +114,19 @@ export default function CursoDetalhe() {
       .from('course_modules')
       .select('id, name, order_index')
       .eq('course_id', courseData.id)
+=======
+    setCourseName(course.name);
+
+    const { data: modulesData } = await supabase
+      .from('course_modules')
+      .select('id, name')
+      .eq('course_id', course.id)
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       .eq('is_active', true)
       .order('order_index');
 
     if (modulesData) {
+<<<<<<< HEAD
       // Para cada módulo, buscar aulas e progresso
       const modulesWithLessons = await Promise.all(
         modulesData.map(async (mod) => {
@@ -134,6 +167,20 @@ export default function CursoDetalhe() {
       setModules(modulesWithLessons);
 
       // Expandir primeiro módulo
+=======
+      const modulesWithLessons = await Promise.all(
+        modulesData.map(async (mod) => {
+          const { data: lessons } = await supabase
+            .from('course_lessons')
+            .select('id, title, is_bonus')
+            .eq('module_id', mod.id)
+            .eq('is_active', true)
+            .order('order_index');
+          return { ...mod, lessons: lessons || [] };
+        })
+      );
+      setModules(modulesWithLessons);
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       if (modulesWithLessons.length > 0) {
         setExpandedModules(new Set([modulesWithLessons[0].id]));
       }
@@ -142,6 +189,7 @@ export default function CursoDetalhe() {
     setLoading(false);
   };
 
+<<<<<<< HEAD
   const toggleModule = (moduleId: string) => {
     const newExpanded = new Set(expandedModules);
     if (newExpanded.has(moduleId)) {
@@ -150,6 +198,13 @@ export default function CursoDetalhe() {
       newExpanded.add(moduleId);
     }
     setExpandedModules(newExpanded);
+=======
+  const toggleModule = (id: string) => {
+    const newSet = new Set(expandedModules);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedModules(newSet);
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
   };
 
   if (authLoading || loading) {
@@ -160,6 +215,7 @@ export default function CursoDetalhe() {
     );
   }
 
+<<<<<<< HEAD
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
   const completedLessons = modules.reduce((acc, m) => acc + m.completedCount, 0);
   const overallProgress = totalLessons > 0 
@@ -169,19 +225,28 @@ export default function CursoDetalhe() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
+=======
+  return (
+    <div className="min-h-screen bg-background">
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-3xl px-4">
           <div className="flex h-14 items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
+<<<<<<< HEAD
             <h1 className="font-semibold text-foreground truncate">
               {course?.name}
             </h1>
+=======
+            <h1 className="font-semibold text-foreground truncate">{courseName}</h1>
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
           </div>
         </div>
       </header>
 
+<<<<<<< HEAD
       {/* Content */}
       <main className="mx-auto max-w-3xl px-4 py-8">
         <div className="space-y-6">
@@ -302,3 +367,43 @@ export default function CursoDetalhe() {
     </div>
   );
 }
+=======
+      <main className="mx-auto max-w-3xl px-4 py-8 space-y-3">
+        {modules.map((mod, modIndex) => (
+          <Card key={mod.id} className="overflow-hidden">
+            <Collapsible open={expandedModules.has(mod.id)} onOpenChange={() => toggleModule(mod.id)}>
+              <CollapsibleTrigger className="w-full p-4 text-left flex items-center gap-3">
+                {expandedModules.has(mod.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <div className="flex-1">
+                  <span className="text-xs text-muted-foreground">Módulo {modIndex + 1}</span>
+                  <h3 className="font-medium text-foreground">{mod.name}</h3>
+                </div>
+                <span className="text-sm text-muted-foreground">{mod.lessons.length} aulas</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="border-t border-border">
+                  {mod.lessons.map((lesson, i) => (
+                    <button
+                      key={lesson.id}
+                      onClick={() => navigate(`/aula/${lesson.id}`)}
+                      className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent/50 border-b border-border last:border-0"
+                    >
+                      <Circle className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <span className="text-xs text-muted-foreground">{modIndex + 1}.{i + 1}</span>
+                        {lesson.is_bonus && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Bônus</span>}
+                        <p className="font-medium text-foreground">{lesson.title}</p>
+                      </div>
+                      <PlayCircle className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        ))}
+      </main>
+    </div>
+  );
+}
+>>>>>>> 21190ae (fix: adicionar arquivos de páginas faltantes)
