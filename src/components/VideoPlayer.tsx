@@ -1,96 +1,112 @@
-import { useState } from 'react';
-import Plyr from 'plyr-react';
-import 'plyr-react/plyr.css';
-import confetti from 'canvas-confetti';
-import { toast } from 'sonner';
+﻿import { useEffect, useRef } from "react";
+import Plyr, { APITypes } from "plyr-react";
+import "plyr/dist/plyr.css";
+import { Card } from "@/components/ui/card";
 
 interface VideoPlayerProps {
-  youtubeId: string;
-  onProgress?: (percentage: number) => void;
+  videoId: string;
   onComplete?: () => void;
+  poster?: string;
 }
 
-export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerProps) {
-  const [hasCompleted, setHasCompleted] = useState(false);
+export const VideoPlayer = ({ videoId, onComplete, poster }: VideoPlayerProps) => {
+  const ref = useRef<APITypes>(null);
 
-  const plyrSource = {
-    type: 'video' as const,
-    sources: [
-      {
-        src: youtubeId,
-        provider: 'youtube' as const,
-      },
-    ],
-  };
-
-  const plyrOptions = {
-    controls: [
-      'play-large',
-      'play',
-      'progress',
-      'current-time',
-      'mute',
-      'volume',
-      'settings',
-      'pip',
-      'fullscreen',
-    ],
-    settings: ['quality', 'speed'],
-    youtube: {
-      noCookie: true,
-      rel: 0,
-      showinfo: 0,
-      iv_load_policy: 3,
-      modestbranding: 1,
+  // Configuração do Player
+  const plyrProps = {
+    source: {
+      type: "video" as const,
+      sources: [
+        {
+          src: videoId,
+          provider: "youtube" as const,
+        },
+      ],
+      // Se tiver poster, adiciona aqui
+      ...(poster && { poster }),
     },
-    ratio: '16:9' as const,
+    options: {
+      controls: [
+        "play-large",
+        "play",
+        "progress",
+        "current-time",
+        "mute",
+        "volume",
+        "settings",
+        "pip",
+        "airplay",
+        "fullscreen",
+      ],
+      settings: ["quality", "speed", "loop"],
+      youtube: { 
+        noCookie: true, 
+        rel: 0, 
+        showinfo: 0, 
+        iv_load_policy: 3, 
+        modestbranding: 1 
+      },
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+    },
   };
 
-  const handleTimeUpdate = (event: any) => {
-    const player = event.detail.plyr;
-    if (player.duration > 0) {
-      const percentage = (player.currentTime / player.duration) * 100;
-      
-      // Atualizar a cada 5%
-      if (percentage % 5 < 0.5) {
-        onProgress?.(Math.round(percentage));
-      }
-
-      // Celebração aos 90%
-      if (percentage >= 90 && !hasCompleted) {
-        setHasCompleted(true);
-        
-        // Confetti
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        
-        // Toast
-        toast.success('🎉 Parabéns!', {
-          description: 'Concluíste esta aula com sucesso!',
-        });
-        
-        onComplete?.();
-      }
+  // Detectar quando o vídeo termina
+  useEffect(() => {
+    const player = ref.current?.plyr;
+    
+    if (player) {
+      player.on("ended", () => {
+        console.log("Aula concluída!");
+        if (onComplete) {
+          onComplete();
+        }
+      });
     }
-  };
+  }, [onComplete]);
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
-      <Plyr 
-        source={plyrSource} 
-        options={plyrOptions}
-        onTimeUpdate={handleTimeUpdate}
-      />
-
+    <Card className="overflow-hidden bg-black aspect-video relative group shadow-2xl border-none ring-1 ring-white/10 rounded-xl">
+      <div className="absolute inset-0 z-10 w-full h-full video-wrapper">
+        <Plyr
+          ref={ref}
+          {...plyrProps}
+          className="w-full h-full"
+        />
+      </div>
+      
+      {/* Estilização Customizada do Plyr para combinar com o tema */}
       <style>{`
         :root {
-          --plyr-color-main: #FFD700;
-          --plyr-video-control-background-hover: #E50914;
+          --plyr-color-main: #e11d48; /* Cor Rose-600 (Tema do site) */
+          --plyr-video-background: #000000;
+          --plyr-menu-background: rgba(20, 20, 20, 0.9);
+          --plyr-menu-color: #ffffff;
+        }
+        
+        .plyr {
+          height: 100%;
+          width: 100%;
+          font-family: inherit;
+        }
+
+        .plyr--full-ui input[type=range] {
+          color: var(--plyr-color-main);
+        }
+
+        .plyr__control--overlaid {
+          background: rgba(225, 29, 72, 0.8);
+        }
+
+        .plyr__control--overlaid:hover {
+          background: #e11d48;
+        }
+        
+        /* Esconder logo do YouTube o máximo possível */
+        .plyr__video-embed iframe {
+          top: -50%;
+          height: 200%;
         }
       `}</style>
-    </div>
+    </Card>
   );
-}
+};
