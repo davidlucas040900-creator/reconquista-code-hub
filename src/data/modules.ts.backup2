@@ -1,6 +1,5 @@
-﻿// Importar módulos de todos os cursos
+﻿// Importar módulos de ambos os cursos
 import { deusaModules } from './deusaModules';
-import { santuarioModules } from './santuarioModules';
 
 export interface Lesson {
   id: number;
@@ -8,7 +7,6 @@ export interface Lesson {
   description: string;
   youtubeId: string;
   duration: string;
-  isBonus?: boolean;
 }
 
 export interface Module {
@@ -20,7 +18,7 @@ export interface Module {
   duration: string;
   lessons: Lesson[];
   progress: number;
-  badge: 'NOVO' | 'POPULAR' | 'EXCLUSIVO' | null;
+  badge: 'NOVO' | 'POPULAR' | null;
 }
 
 // Módulos do Código da Reconquista (IDs 1-7)
@@ -214,11 +212,10 @@ const codigoReconquistaModules: Module[] = [
   },
 ];
 
-// Exportar TODOS os módulos (Código da Reconquista + A Deusa na Cama + O Santuário)
+// Exportar TODOS os módulos (Código da Reconquista + A Deusa na Cama)
 export const modules: Module[] = [
   ...codigoReconquistaModules,
   ...deusaModules,
-  ...santuarioModules,
 ];
 
 // Funções auxiliares
@@ -233,4 +230,3 @@ export const getModuleBySlug = (slug: string): Module | undefined => {
 // Separar módulos por curso
 export const codigoModules = modules.filter(m => m.id >= 1 && m.id <= 7);
 export const deusaModulesFiltered = modules.filter(m => m.id >= 8 && m.id <= 14);
-export const santuarioModulesFiltered = modules.filter(m => m.id >= 15 && m.id <= 20);
