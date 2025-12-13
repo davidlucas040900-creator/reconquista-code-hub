@@ -3,17 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Play, 
+import {
+  Play,
   ChevronRight,
   User,
   LogOut,
   Menu,
-  X
+  X,
+  BookOpen,
+  Users,
+  FileText,
+  Headphones,
+  Crown
 } from 'lucide-react';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Course {
   id: string;
@@ -44,7 +46,6 @@ export default function Dashboard() {
     if (!user) return;
 
     try {
-      // Carregar perfil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('full_name')
@@ -53,7 +54,6 @@ export default function Dashboard() {
 
       setProfile(profileData);
 
-      // Carregar cursos mockados (você vai conectar com banco real)
       setCourses([
         {
           id: '1',
@@ -78,10 +78,10 @@ export default function Dashboard() {
         },
       ]);
 
-      // Última aula assistida (mocado)
       setContinueLesson({
         title: 'A Técnica do Silêncio',
         module: 'Módulo 2',
+        lessonNumber: 8,
         progress: 65,
         courseSlug: 'codigo-reconquista',
       });
@@ -100,8 +100,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-500" />
       </div>
     );
   }
@@ -110,236 +110,239 @@ export default function Dashboard() {
   const completedLessons = courses.reduce((sum, c) => sum + c.completed_lessons, 0);
   const overallProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-8">
-              <h1 className="text-lg font-semibold text-foreground">
-                Reconquista
-              </h1>
-            </div>
+  const quickLinks = [
+    { icon: Users, label: 'Comunidade', onClick: () => window.open('https://chat.whatsapp.com/xyz', '_blank') },
+    { icon: FileText, label: 'Materiais', onClick: () => navigate('/materiais') },
+    { icon: Headphones, label: 'Suporte', onClick: () => window.open('https://wa.me/258834569225', '_blank') },
+    { icon: Crown, label: 'Meu Plano', onClick: () => navigate('/meu-plano') },
+  ];
 
-            {/* Desktop Nav */}
-            <div className="hidden items-center gap-4 md:flex">
-              <ThemeToggle />
+  return (
+    <div className="min-h-screen bg-zinc-950">
+      {/* ========== HEADER ========== */}
+      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex h-14 items-center justify-between">
+            <span className="text-base font-medium tracking-tight text-zinc-100">
+              Reconquista
+            </span>
+
+            <nav className="hidden items-center gap-1 md:flex">
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
                 onClick={() => navigate('/perfil')}
               >
-                <User className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="border-t border-border bg-background md:hidden">
-            <div className="space-y-1 px-4 py-3">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2"
-                onClick={() => {
-                  navigate('/perfil');
-                  setMobileMenuOpen(false);
-                }}
-              >
-                <User className="h-4 w-4" />
+                <User className="mr-2 h-4 w-4" />
                 Perfil
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-2"
+                size="sm"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
                 onClick={handleLogout}
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </Button>
+            </nav>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="border-t border-zinc-800/50 bg-zinc-900/95 md:hidden">
+            <div className="space-y-1 px-4 py-3">
+              <button
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800/50"
+                onClick={() => { navigate('/perfil'); setMobileMenuOpen(false); }}
+              >
+                <User className="h-4 w-4 text-zinc-500" />
+                Perfil
+              </button>
+              <button
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800/50"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 text-zinc-500" />
+                Sair
+              </button>
             </div>
           </div>
         )}
       </header>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-        <div className="space-y-8 lg:space-y-12">
-          
-          {/* Welcome Section */}
+      {/* ========== MAIN ========== */}
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
+        <div className="space-y-10 lg:space-y-14">
+
+          {/* ===== WELCOME ===== */}
           <section>
-            <h2 className="text-2xl font-semibold text-foreground sm:text-3xl">
-              Olá, {profile?.full_name || 'Guerreira'}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-100 sm:text-3xl">
+              Olá, {profile?.full_name?.split(' ')[0] || 'Guerreira'}
+            </h1>
+            <p className="mt-1.5 text-sm text-zinc-500">
               Continue sua jornada de transformação
             </p>
           </section>
 
-          {/* Continue Watching */}
+          {/* ===== CONTINUE WATCHING ===== */}
           {continueLesson && (
             <section>
-              <h3 className="mb-4 text-sm font-medium text-foreground">
+              <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Continue de onde parou
-              </h3>
-              <Card className="border-border p-6 transition-colors hover:bg-accent/50">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex-1">
-                    <div className="mb-1 text-xs text-muted-foreground">
-                      {continueLesson.module}
+              </h2>
+              <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-5 sm:p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <span className="text-xs text-zinc-500">
+                        {continueLesson.module}  Aula {continueLesson.lessonNumber}
+                      </span>
+                      <h3 className="mt-1 text-lg font-medium text-zinc-100">
+                        {continueLesson.title}
+                      </h3>
                     </div>
-                    <h4 className="mb-2 text-lg font-medium text-foreground">
-                      {continueLesson.title}
-                    </h4>
                     <div className="flex items-center gap-3">
-                      <Progress value={continueLesson.progress} className="h-1 w-32" />
-                      <span className="text-xs text-muted-foreground">
+                      <div className="h-1 w-32 overflow-hidden rounded-full bg-zinc-800">
+                        <div 
+                          className="h-full bg-amber-500 rounded-full"
+                          style={{ width: `${continueLesson.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-zinc-500">
                         {continueLesson.progress}%
                       </span>
                     </div>
                   </div>
                   <Button
                     onClick={() => navigate(`/cursos/${continueLesson.courseSlug}`)}
-                    className="gap-2"
+                    className="bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
                   >
-                    <Play className="h-4 w-4" />
+                    <Play className="mr-2 h-4 w-4" />
                     Continuar
                   </Button>
                 </div>
-              </Card>
+              </div>
             </section>
           )}
 
-          {/* Overall Progress */}
+          {/* ===== OVERALL PROGRESS ===== */}
           <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-foreground">
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Progresso Geral
-              </h3>
-              <span className="text-sm text-muted-foreground">
-                {completedLessons} de {totalLessons} aulas
+              </h2>
+              <span className="text-sm tabular-nums text-zinc-400">
+                {completedLessons}/{totalLessons} aulas
               </span>
             </div>
-            <Progress value={overallProgress} className="h-2" />
+            <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              <div 
+                className="h-full bg-amber-500 rounded-full"
+                style={{ width: `${overallProgress}%` }}
+              />
+            </div>
           </section>
 
-          {/* Courses Grid */}
+          {/* ===== COURSES ===== */}
           <section>
-            <h3 className="mb-6 text-sm font-medium text-foreground">
+            <h2 className="mb-5 text-xs font-medium uppercase tracking-wider text-zinc-500">
               Seus Cursos
-            </h3>
+            </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {courses.map((course) => {
                 const progress = course.total_lessons > 0
                   ? (course.completed_lessons / course.total_lessons) * 100
                   : 0;
+                const isStarted = course.completed_lessons > 0;
 
                 return (
-                  <Card
+                  <button
                     key={course.id}
-                    className="group cursor-pointer border-border p-6 transition-colors hover:bg-accent/50"
                     onClick={() => navigate(`/cursos/${course.slug}`)}
+                    className="group flex flex-col rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-5 text-left hover:border-zinc-700/50 hover:bg-zinc-900/50"
                   >
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="mb-1 font-medium text-foreground group-hover:text-foreground">
-                          {course.name}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          {course.total_lessons} aulas
-                        </p>
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className="rounded-lg bg-zinc-800/50 p-2">
+                        <BookOpen className="h-4 w-4 text-zinc-400" />
                       </div>
-
-                      {progress > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Progresso</span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                          <Progress value={progress} className="h-1" />
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-sm text-muted-foreground">
-                          {course.completed_lessons > 0 ? 'Continuar' : 'Começar'}
+                      {isStarted && (
+                        <span className="text-xs font-medium text-amber-500">
+                          {Math.round(progress)}%
                         </span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                      </div>
+                      )}
                     </div>
-                  </Card>
+
+                    <h3 className="mb-1 font-medium text-zinc-100">
+                      {course.name}
+                    </h3>
+                    <p className="mb-4 text-sm text-zinc-500">
+                      {course.total_lessons} aulas
+                    </p>
+
+                    {isStarted && (
+                      <div className="mb-4 h-1 overflow-hidden rounded-full bg-zinc-800">
+                        <div 
+                          className="h-full bg-amber-500/80 rounded-full"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="mt-auto flex items-center justify-between pt-2 border-t border-zinc-800/50">
+                      <span className="text-sm text-zinc-400">
+                        {isStarted ? 'Continuar' : 'Começar'}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400" />
+                    </div>
+                  </button>
                 );
               })}
             </div>
           </section>
 
-          {/* Quick Links */}
+          {/* ===== QUICK LINKS ===== */}
           <section>
-            <h3 className="mb-6 text-sm font-medium text-foreground">
+            <h2 className="mb-5 text-xs font-medium uppercase tracking-wider text-zinc-500">
               Recursos
-            </h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card
-                className="cursor-pointer border-border p-4 text-center transition-colors hover:bg-accent/50"
-                onClick={() => window.open('https://chat.whatsapp.com/xyz', '_blank')}
-              >
-                <div className="text-sm font-medium text-foreground">
-                  Comunidade
-                </div>
-              </Card>
-              <Card
-                className="cursor-pointer border-border p-4 text-center transition-colors hover:bg-accent/50"
-                onClick={() => navigate('/materiais')}
-              >
-                <div className="text-sm font-medium text-foreground">
-                  Materiais
-                </div>
-              </Card>
-              <Card
-                className="cursor-pointer border-border p-4 text-center transition-colors hover:bg-accent/50"
-                onClick={() => window.open('https://wa.me/258834569225', '_blank')}
-              >
-                <div className="text-sm font-medium text-foreground">
-                  Suporte
-                </div>
-              </Card>
-              <Card
-                className="cursor-pointer border-border p-4 text-center transition-colors hover:bg-accent/50"
-                onClick={() => navigate('/meu-plano')}
-              >
-                <div className="text-sm font-medium text-foreground">
-                  Meu Plano
-                </div>
-              </Card>
+            </h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {quickLinks.map((link) => (
+                <button
+                  key={link.label}
+                  onClick={link.onClick}
+                  className="flex flex-col items-center gap-2 rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-4 hover:border-zinc-700/50 hover:bg-zinc-900/50"
+                >
+                  <link.icon className="h-5 w-5 text-zinc-500" />
+                  <span className="text-sm font-medium text-zinc-300">
+                    {link.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </section>
 
         </div>
       </main>
+
+      {/* ========== FOOTER ========== */}
+      <footer className="mt-auto border-t border-zinc-800/50 bg-zinc-900/30">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <p className="text-center text-xs text-zinc-600">
+             2024 Reconquista. Todos os direitos reservados.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
