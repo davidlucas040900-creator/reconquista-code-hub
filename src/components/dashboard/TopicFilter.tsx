@@ -6,12 +6,20 @@ interface TopicFilterProps {
   topics: Topic[];
   activeTopic: string;
   onTopicChange: (topicId: string) => void;
+  label?: string;
 }
 
-export function TopicFilter({ topics, activeTopic, onTopicChange }: TopicFilterProps) {
+export function TopicFilter({ topics, activeTopic, onTopicChange, label }: TopicFilterProps) {
   return (
-    <section className="py-6">
+    <section className="py-4">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Label opcional */}
+        {label && (
+          <p className="text-xs text-silk-400 uppercase tracking-wider mb-3">
+            {label}
+          </p>
+        )}
+        
         <div className="scroll-container">
           {topics.map((topic) => (
             <button
