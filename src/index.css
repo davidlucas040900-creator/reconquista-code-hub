@@ -96,7 +96,7 @@
   .card-noir {
     @apply bg-noir-900/50 border border-white/5 rounded-xl p-6
            hover:border-gold/20 hover:bg-noir-800/50
-           transition-all duration-400 ease-premium;
+           transition-all duration-300 ease-premium;
   }
 
   .card-interactive {
@@ -236,3 +236,4 @@
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 }
+
