@@ -1,15 +1,36 @@
 ﻿// src/components/dashboard/CourseSection.tsx
 
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ChevronRight } from 'lucide-react';
 import { Course } from '@/types';
 
 interface CourseSectionProps {
   course: Course;
+  activeTopicFilter: string;
 }
 
-export function CourseSection({ course }: CourseSectionProps) {
+export function CourseSection({ course, activeTopicFilter }: CourseSectionProps) {
   const navigate = useNavigate();
+
+  // Filtrar MÓDULOS pelo tópico selecionado
+  const filteredModules = useMemo(() => {
+    if (activeTopicFilter === 'all') {
+      return course.modules;
+    }
+    // Filtra módulos que pertencem ao tópico do curso
+    // Se o curso tem o tópico selecionado, mostra todos os módulos
+    // Senão, não mostra nenhum módulo
+    if (course.topics.includes(activeTopicFilter)) {
+      return course.modules;
+    }
+    return [];
+  }, [course, activeTopicFilter]);
+
+  // Se não há módulos para mostrar, não renderiza a seção
+  if (filteredModules.length === 0) {
+    return null;
+  }
 
   const handleModuleClick = (moduleId: string, isLocked: boolean) => {
     if (isLocked) {
@@ -42,7 +63,7 @@ export function CourseSection({ course }: CourseSectionProps) {
 
         {/* Modules Slider */}
         <div className="scroll-container">
-          {course.modules.map((module) => {
+          {filteredModules.map((module) => {
             const isLocked = !course.isPurchased || module.isLocked;
             const progress = module.lessonsCount > 0
               ? (module.completedLessons / module.lessonsCount) * 100
@@ -54,7 +75,7 @@ export function CourseSection({ course }: CourseSectionProps) {
                 onClick={() => handleModuleClick(module.id, isLocked)}
                 className="scroll-item w-40 md:w-48"
               >
-                <div className="card-module group">
+                <div className="card-module">
                   {/* Image - SEM BLUR, apenas opacidade reduzida se bloqueado */}
                   <img
                     src={module.image}
@@ -74,7 +95,7 @@ export function CourseSection({ course }: CourseSectionProps) {
                     </div>
                   )}
 
-                  {/* Progress Indicator - só aparece se não bloqueado e tem progresso */}
+                  {/* Progress Indicator */}
                   {!isLocked && progress > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
                       <div
@@ -82,11 +103,6 @@ export function CourseSection({ course }: CourseSectionProps) {
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                  )}
-
-                  {/* Hover effect para módulos desbloqueados */}
-                  {!isLocked && (
-                    <div className="absolute inset-0 bg-gold/0 group-hover:bg-gold/10 transition-colors duration-300 rounded-xl" />
                   )}
                 </div>
               </button>
