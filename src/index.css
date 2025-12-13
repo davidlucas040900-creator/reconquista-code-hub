@@ -1,170 +1,238 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 
+   DARK NOIR PREMIUM - CSS GLOBAL
+    */
+
 @layer base {
   :root {
-    --background: 0 0% 8%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 51 100% 50%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 357 87% 49%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 51 100% 50%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 51 100% 50%;
-    --radius: 0.75rem;
-    --plyr-color-main: hsl(51 100% 50%);
-    --plyr-video-control-background-hover: hsl(357 87% 49%);
-    --plyr-video-control-color: hsl(0 0% 100%);
-    --plyr-font-family: 'Montserrat', sans-serif;
-  }
-
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 8%;
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 8%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 8%;
-    --primary: 51 100% 50%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 357 87% 49%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 95%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 51 100% 50%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 51 100% 50%;
+    /* Core Colors */
+    --noir-950: #0a0a0a;
+    --noir-900: #121212;
+    --noir-800: #1a1a1a;
+    --gold: #D4AF37;
+    --royal: #4B0082;
+    --silk-100: #F5F5F5;
+    --silk-300: #A0A0A0;
   }
 
   * {
-    @apply border-border;
-  }
-  
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Montserrat', 'Proxima Nova', sans-serif;
+    @apply border-noir-800;
   }
 
   html {
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  *::-webkit-scrollbar {
-    width: 8px;
+  body {
+    @apply bg-noir-950 text-silk-100 font-montserrat;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  *::-webkit-scrollbar-track {
-    background: transparent;
+  /* Scrollbar Premium */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
 
-  *::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary) / 0.3);
-    border-radius: 10px;
+  ::-webkit-scrollbar-track {
+    background: var(--noir-900);
   }
 
-  *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.5);
+  ::-webkit-scrollbar-thumb {
+    background: var(--noir-700);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--gold);
+  }
+
+  /* Selection */
+  ::selection {
+    background: rgba(212, 175, 55, 0.3);
+    color: var(--silk-100);
   }
 }
 
-@layer utilities {
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-in-out;
+@layer components {
+  /*  GLASSMORPHISM  */
+  .glass {
+    @apply bg-black/30 backdrop-blur-xl border border-white/10;
   }
 
-  .animate-scale-in {
-    animation: scale-in 0.3s ease-out;
+  .glass-card {
+    @apply bg-noir-900/80 backdrop-blur-xl border border-white/5 rounded-xl;
   }
 
-  @keyframes fade-in {
+  /*  BOTÕES PREMIUM  */
+  .btn-gold {
+    @apply bg-gold text-noir-950 font-semibold px-6 py-3 rounded-lg
+           hover:bg-gold-light active:scale-[0.98]
+           transition-all duration-300 ease-premium
+           shadow-gold hover:shadow-gold-lg
+           focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 focus:ring-offset-noir-950;
+  }
+
+  .btn-royal {
+    @apply bg-royal text-white font-semibold px-6 py-3 rounded-lg
+           hover:bg-royal-light active:scale-[0.98]
+           transition-all duration-300 ease-premium
+           shadow-royal
+           focus:outline-none focus:ring-2 focus:ring-royal focus:ring-offset-2 focus:ring-offset-noir-950;
+  }
+
+  .btn-ghost {
+    @apply text-silk-300 hover:text-silk-100 hover:bg-white/5
+           px-4 py-2 rounded-lg
+           transition-all duration-300 ease-premium;
+  }
+
+  /*  CARDS  */
+  .card-noir {
+    @apply bg-noir-900/50 border border-white/5 rounded-xl p-6
+           hover:border-gold/20 hover:bg-noir-800/50
+           transition-all duration-400 ease-premium;
+  }
+
+  .card-interactive {
+    @apply card-noir cursor-pointer
+           hover:scale-[1.02] hover:shadow-card
+           active:scale-[0.99];
+  }
+
+  /*  TIPOGRAFIA  */
+  .heading-display {
+    @apply font-playfair text-4xl md:text-5xl lg:text-6xl font-bold text-silk-100;
+  }
+
+  .heading-section {
+    @apply font-playfair text-2xl md:text-3xl font-bold text-silk-100;
+  }
+
+  .heading-card {
+    @apply font-montserrat text-lg font-semibold text-silk-100;
+  }
+
+  .text-body {
+    @apply font-montserrat text-base text-silk-300;
+  }
+
+  .text-small {
+    @apply font-montserrat text-sm text-silk-400;
+  }
+
+  /*  PROGRESS BAR  */
+  .progress-gold {
+    @apply h-1.5 bg-noir-800 rounded-full overflow-hidden;
+  }
+
+  .progress-gold-fill {
+    @apply h-full bg-gradient-to-r from-gold-dark via-gold to-gold-light
+           rounded-full transition-all duration-500 ease-premium
+           shadow-[0_0_10px_rgba(212,175,55,0.5)];
+  }
+
+  /*  BADGES  */
+  .badge-gold {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full
+           text-xs font-medium bg-gold/20 text-gold border border-gold/30;
+  }
+
+  .badge-royal {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full
+           text-xs font-medium bg-royal/20 text-purple-300 border border-royal/30;
+  }
+
+  .badge-new {
+    @apply badge-royal animate-pulse-gold;
+  }
+
+  /*  INPUTS  */
+  .input-noir {
+    @apply w-full bg-noir-800 border border-white/10 rounded-lg px-4 py-3
+           text-silk-100 placeholder-silk-400
+           focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold
+           transition-all duration-300;
+  }
+
+  /*  ESTADOS  */
+  .locked-overlay {
+    @apply absolute inset-0 bg-noir-950/80 backdrop-blur-sm
+           flex items-center justify-center rounded-xl;
+  }
+
+  .completed-check {
+    @apply text-gold;
+  }
+
+  /*  ANIMAÇÕES  */
+  .animate-in {
+    animation: fadeIn 0.5s ease-premium forwards;
+  }
+
+  @keyframes fadeIn {
     from {
       opacity: 0;
+      transform: translateY(10px);
     }
     to {
       opacity: 1;
+      transform: translateY(0);
     }
   }
 
-  @keyframes scale-in {
-    from {
-      transform: scale(0.95);
-      opacity: 0;
-    }
-    to {
-      transform: scale(1);
-      opacity: 1;
-    }
+  /*  CAROUSEL  */
+  .carousel-container {
+    @apply relative overflow-hidden;
   }
 
-  /* ============================================
-     SCROLLBAR CUSTOMIZADA PARA CARROSSÉIS
-     ============================================ */
-  
-  /* Ocultar scrollbar mas manter funcionalidade */
+  .carousel-track {
+    @apply flex gap-4 overflow-x-auto snap-x snap-mandatory
+           scrollbar-hide pb-4;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .carousel-item {
+    @apply flex-shrink-0 snap-start;
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+}
+
+@layer utilities {
+  /* Responsive Typography */
+  .text-responsive-xl {
+    font-size: clamp(1.5rem, 4vw, 3rem);
   }
-  
-  /* Scrollbar visível estilizada (alternativa) */
-  .scrollbar-custom::-webkit-scrollbar {
-    height: 8px;
+
+  .text-responsive-lg {
+    font-size: clamp(1.25rem, 3vw, 2rem);
   }
-  
-  .scrollbar-custom::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-    border-radius: 4px;
+
+  .text-responsive-base {
+    font-size: clamp(0.875rem, 2vw, 1rem);
   }
-  
-  .scrollbar-custom::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary));
-    border-radius: 4px;
+
+  /* Gold Gradient Text */
+  .text-gold-gradient {
+    @apply bg-gradient-to-r from-gold-dark via-gold to-gold-light
+           bg-clip-text text-transparent;
   }
-  
-  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.8);
-  }
-  
-  /* Snap scroll suave */
-  .snap-x {
-    scroll-snap-type: x mandatory;
-  }
-  
-  .snap-start {
-    scroll-snap-align: start;
-  }
-  
-  /* Animação de pulse para elementos premium */
-  @keyframes pulse-glow {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-  }
-  
-  .animate-pulse-glow {
-    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  /* Transition Premium */
+  .transition-premium {
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 }
