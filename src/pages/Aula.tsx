@@ -1,19 +1,14 @@
-﻿// src/pages/Aula.tsx
-
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { VideoPlayer } from '@/components/VideoPlayer'; // IMPORTAR VIDEOPLAYER
+import { VideoPlayer } from '@/components/VideoPlayer';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
   Circle,
-  PlayCircle,
   Loader2,
   Menu,
   X
@@ -81,7 +76,6 @@ export default function Aula() {
   const fetchLesson = async () => {
     if (!user || !lessonId) return;
 
-    // Buscar aula
     const { data: lessonData } = await supabase
       .from('course_lessons')
       .select('*')
@@ -95,7 +89,6 @@ export default function Aula() {
 
     setLesson(lessonData);
 
-    // Buscar módulo
     const { data: moduleData } = await supabase
       .from('course_modules')
       .select('id, name, course_id')
@@ -104,7 +97,6 @@ export default function Aula() {
 
     setModule(moduleData);
 
-    // Buscar progresso do usuário
     const { data: progressData } = await supabase
       .from('user_lesson_progress')
       .select('is_completed, watch_percentage')
@@ -117,7 +109,6 @@ export default function Aula() {
       setWatchProgress(progressData.watch_percentage || 0);
     }
 
-    // Buscar todos os módulos e aulas para a sidebar
     if (moduleData) {
       const { data: allModules } = await supabase
         .from('course_modules')
@@ -159,25 +150,14 @@ export default function Aula() {
 
         setSidebarModules(modulesWithLessons);
 
-        // Encontrar aula anterior e próxima
         const allLessons = modulesWithLessons.flatMap(m => m.lessons);
         const currentIndex = allLessons.findIndex(l => l.id === lessonId);
 
-        if (currentIndex > 0) {
-          setPrevLesson(allLessons[currentIndex - 1].id);
-        } else {
-          setPrevLesson(null);
-        }
-
-        if (currentIndex < allLessons.length - 1) {
-          setNextLesson(allLessons[currentIndex + 1].id);
-        } else {
-          setNextLesson(null);
-        }
+        setPrevLesson(currentIndex > 0 ? allLessons[currentIndex - 1].id : null);
+        setNextLesson(currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1].id : null);
       }
     }
 
-    // Registrar acesso
     await supabase.from('access_logs').insert({
       user_id: user.id,
       action: 'lesson_view',
@@ -189,10 +169,9 @@ export default function Aula() {
 
   const handleProgress = async (percentage: number) => {
     setWatchProgress(percentage);
-    
+
     if (!user || !lessonId) return;
 
-    // Atualizar progresso no banco
     await supabase.from('user_lesson_progress').upsert({
       user_id: user.id,
       lesson_id: lessonId,
@@ -220,7 +199,6 @@ export default function Aula() {
     setIsCompleted(true);
     toast.success(' Aula concluída!');
 
-    // Atualizar sidebar
     setSidebarModules(prev =>
       prev.map(mod => ({
         ...mod,
@@ -230,7 +208,6 @@ export default function Aula() {
       }))
     );
 
-    // Navegar para próxima se existir
     if (nextLesson) {
       setTimeout(() => {
         navigate(`/aula/${nextLesson}`);
@@ -238,31 +215,32 @@ export default function Aula() {
     }
   };
 
-  const markAsComplete = async () => {
-    await handleComplete();
-  };
-
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-zinc-950">
+      {/* ========== HEADER ========== */}
+      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
         <div className="px-4">
           <div className="flex h-14 items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+                onClick={() => navigate('/dashboard')}
+              >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <div className="hidden sm:block">
-                <p className="text-xs text-muted-foreground">{module?.name}</p>
-                <h1 className="font-medium text-foreground truncate max-w-md">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider">{module?.name}</p>
+                <h1 className="text-sm font-medium text-zinc-100 truncate max-w-md">
                   {lesson?.title}
                 </h1>
               </div>
@@ -271,50 +249,55 @@ export default function Aula() {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 lg:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
-              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
           </div>
         </div>
       </header>
 
       <div className="flex">
-        {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6">
+        {/* ========== MAIN CONTENT ========== */}
+        <main className="flex-1 p-4 lg:p-8">
           <div className="max-w-4xl mx-auto space-y-6">
-            {/* SUBSTITUÍDO: USAR VIDEOPLAYER COM PLYR */}
+            {/* Video Player */}
             {lesson?.video_url ? (
-              <VideoPlayer
-                youtubeId={lesson.video_url}
-                onProgress={handleProgress}
-                onComplete={handleComplete}
-              />
+              <div className="rounded-lg overflow-hidden border border-zinc-800/50">
+                <VideoPlayer
+                  youtubeId={lesson.video_url}
+                  onProgress={handleProgress}
+                  onComplete={handleComplete}
+                />
+              </div>
             ) : (
-              <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
-                <p className="text-white/50">Vídeo não disponível</p>
+              <div className="aspect-video bg-zinc-900 rounded-lg overflow-hidden flex items-center justify-center border border-zinc-800/50">
+                <p className="text-zinc-500">Vídeo não disponível</p>
               </div>
             )}
 
             {/* Lesson Info */}
-            <div>
+            <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-6">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <h1 className="text-xl font-semibold text-foreground mb-1">
+                  <h1 className="text-xl font-semibold text-zinc-100 mb-2">
                     {lesson?.title}
                   </h1>
                   {lesson?.is_bonus && (
-                    <span className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-1 rounded">
-                      Aula Bônus
+                    <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium">
+                      AULA BÔNUS
                     </span>
                   )}
                 </div>
 
                 <Button
-                  onClick={markAsComplete}
+                  onClick={handleComplete}
                   disabled={isCompleted}
-                  variant={isCompleted ? 'outline' : 'default'}
+                  className={isCompleted 
+                    ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700" 
+                    : "bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
+                  }
                 >
                   {isCompleted ? (
                     <>
@@ -328,24 +311,30 @@ export default function Aula() {
               </div>
 
               {lesson?.description && (
-                <p className="text-muted-foreground">{lesson.description}</p>
+                <p className="text-zinc-400 mb-4">{lesson.description}</p>
               )}
 
               {/* Progress Bar */}
-              <div className="mt-4">
+              <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Progresso da aula</span>
-                  <span className="text-foreground font-medium">{watchProgress}%</span>
+                  <span className="text-zinc-500">Progresso da aula</span>
+                  <span className="text-zinc-400 font-medium tabular-nums">{watchProgress}%</span>
                 </div>
-                <Progress value={watchProgress} className="h-2" />
+                <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                  <div 
+                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                    style={{ width: `${watchProgress}%` }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Navigation */}
-            <div className="flex items-center justify-between pt-4 border-t border-border">
+            <div className="flex items-center justify-between">
               {prevLesson ? (
                 <Button
                   variant="outline"
+                  className="border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
                   onClick={() => navigate(`/aula/${prevLesson}`)}
                 >
                   <ChevronLeft className="h-4 w-4 mr-2" />
@@ -356,7 +345,10 @@ export default function Aula() {
               )}
 
               {nextLesson && (
-                <Button onClick={() => navigate(`/aula/${nextLesson}`)}>
+                <Button 
+                  className="bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
+                  onClick={() => navigate(`/aula/${nextLesson}`)}
+                >
                   Próxima
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -365,21 +357,23 @@ export default function Aula() {
           </div>
         </main>
 
-        {/* Sidebar */}
+        {/* ========== SIDEBAR ========== */}
         <aside className={`
           fixed lg:static inset-y-0 right-0 z-40
-          w-80 bg-background border-l border-border
+          w-80 bg-zinc-900/50 border-l border-zinc-800/50
           transform transition-transform lg:transform-none
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
         `}>
           <div className="h-full overflow-y-auto p-4">
-            <h2 className="font-semibold text-foreground mb-4">Conteúdo do curso</h2>
+            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-4">
+              Conteúdo do curso
+            </h2>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {sidebarModules.map((mod, modIndex) => (
                 <div key={mod.id}>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Módulo {modIndex + 1}: {mod.name}
+                  <p className="text-xs text-zinc-500 mb-2">
+                    MÓDULO {modIndex + 1}  {mod.name}
                   </p>
 
                   <div className="space-y-1">
@@ -391,17 +385,17 @@ export default function Aula() {
                           setSidebarOpen(false);
                         }}
                         className={`
-                          w-full flex items-center gap-2 p-2 rounded-md text-left text-sm transition-colors
+                          w-full flex items-center gap-3 px-3 py-2.5 rounded text-left text-sm transition-colors
                           ${sideLesson.id === lessonId
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-accent/50 text-muted-foreground'
+                            ? 'bg-zinc-800 text-zinc-100'
+                            : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100'
                           }
                         `}
                       >
                         {sideLesson.is_completed ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
                         ) : (
-                          <Circle className="h-4 w-4 flex-shrink-0" />
+                          <Circle className="h-4 w-4 text-zinc-600 flex-shrink-0" />
                         )}
                         <span className="truncate">
                           {modIndex + 1}.{lessonIndex + 1} {sideLesson.title}
@@ -416,7 +410,7 @@ export default function Aula() {
         </aside>
       </div>
 
-      {/* Overlay for mobile sidebar */}
+      {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"

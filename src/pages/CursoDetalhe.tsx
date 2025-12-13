@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ChevronLeft, ChevronDown, ChevronRight, PlayCircle, Circle, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, PlayCircle, Circle, Loader2, Lock } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Module {
@@ -85,72 +84,95 @@ export default function CursoDetalhe() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+    <div className="min-h-screen bg-zinc-950">
+      {/* ========== HEADER ========== */}
+      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
         <div className="mx-auto max-w-3xl px-4">
           <div className="flex h-14 items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+              onClick={() => navigate('/dashboard')}
+            >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <h1 className="font-semibold text-foreground truncate">{courseName}</h1>
+            <h1 className="text-base font-medium text-zinc-100 truncate">{courseName}</h1>
           </div>
         </div>
       </header>
 
+      {/* ========== MAIN ========== */}
       <main className="mx-auto max-w-3xl px-4 py-8 space-y-3">
         {modules.map((mod, modIndex) => (
-          <Card key={mod.id} className="overflow-hidden">
+          <div key={mod.id} className="overflow-hidden rounded-lg border border-zinc-800/50 bg-zinc-900/30">
             <Collapsible open={expandedModules.has(mod.id)} onOpenChange={() => toggleModule(mod.id)}>
-              <CollapsibleTrigger className="w-full p-4 text-left flex items-center gap-3">
+              <CollapsibleTrigger className="w-full p-5 text-left flex items-center gap-4 hover:bg-zinc-900/50">
                 {expandedModules.has(mod.id) ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  <ChevronDown className="h-4 w-4 text-zinc-500 flex-shrink-0" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <ChevronRight className="h-4 w-4 text-zinc-500 flex-shrink-0" />
                 )}
-                <div className="flex-1">
-                  <span className="text-xs text-muted-foreground">Módulo {modIndex + 1}</span>
-                  <h3 className="font-medium text-foreground">{mod.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs uppercase tracking-wider text-zinc-500">
+                    Módulo {modIndex + 1}
+                  </span>
+                  <h3 className="mt-0.5 font-medium text-zinc-100">{mod.name}</h3>
                 </div>
-                <span className="text-sm text-muted-foreground">{mod.lessons.length} aulas</span>
+                <span className="text-sm tabular-nums text-zinc-400 flex-shrink-0">
+                  {mod.lessons.length} aulas
+                </span>
               </CollapsibleTrigger>
+              
               <CollapsibleContent>
-                <div className="border-t border-border">
+                <div className="border-t border-zinc-800/50">
                   {mod.lessons.map((lesson, i) => (
                     <button
                       key={lesson.id}
                       onClick={() => navigate(`/aula/${lesson.id}`)}
-                      className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent/50 border-b border-border last:border-0"
+                      className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-zinc-900/50 border-b border-zinc-800/30 last:border-0 group"
                     >
-                      <Circle className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
+                      <Circle className="h-4 w-4 text-zinc-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs text-zinc-500 tabular-nums">
                             {modIndex + 1}.{i + 1}
                           </span>
                           {lesson.is_bonus && (
-                            <span className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1.5 py-0.5 rounded">
-                              Bônus
+                            <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded font-medium">
+                              BÔNUS
                             </span>
                           )}
                         </div>
-                        <p className="font-medium text-foreground">{lesson.title}</p>
+                        <p className="text-sm text-zinc-200 group-hover:text-zinc-100">
+                          {lesson.title}
+                        </p>
                       </div>
-                      <PlayCircle className="h-5 w-5 text-muted-foreground" />
+                      <PlayCircle className="h-4 w-4 text-zinc-600 flex-shrink-0 group-hover:text-zinc-400" />
                     </button>
                   ))}
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </Card>
+          </div>
         ))}
       </main>
+
+      {/* ========== FOOTER ========== */}
+      <footer className="mt-auto border-t border-zinc-800/50 bg-zinc-900/30">
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <p className="text-center text-xs text-zinc-600">
+            © 2024 Reconquista. Todos os direitos reservados.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
