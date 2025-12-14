@@ -19,16 +19,16 @@ const courseDescriptions: Record<string, string> = {
   'santuario': 'O círculo exclusivo das mulheres que dominam o jogo.',
 };
 
-// Descrições dos módulos do Santuário
-const santuarioDescriptions = [
-  "Aprende a ler microexpressões faciais e sinais vocais para saberes, em segundos, se ele está a mentir ou a esconder algo.",
-  "Transforma o teu Instagram numa armadilha psicológica que gera obsessão, ciúmes e o faz vigiar cada passo teu.",
-  "A tua enciclopédia de respostas prontas para dominar qualquer conversa, desarmar o ego dele e inverter o jogo de poder.",
-  "O guia de defesa para identificar e neutralizar os 5 tipos de homens perigosos antes que te magoem.",
-  "Fizeste asneira? Segue este plano de choque de 24 horas para limpar a tua imagem e recuperar a dignidade instantaneamente.",
-  "Áudios de reprogramação mental para ouvires nos momentos de fraqueza e impedires-te de ir atrás dele.",
-  "Assiste à análise tática de casos reais e descobre a estratégia exata usada para reverter as situações mais difíceis."
-];
+// Descrições resumidas dos módulos do Santuário (por slug)
+const santuarioModuleDescriptions: Record<string, string> = {
+  'o-poder-da-onisciencia': 'Detecta mentiras e nunca mais seja enganada.',
+  'o-campo-de-batalha-digital': 'Aprenda a fazer posts estratégicos que ativam ciúmes e desejo.',
+  'acesso-ao-cerebro-dele': 'Respostas que desarmam qualquer ego masculino.',
+  'a-blacklist-masculina': 'Neutraliza homens perigosos antes que magoem.',
+  'o-protocolo-de-emergencia': 'Áudios de emergência para momentos críticos',
+  'o-diario-da-deusa-bonus': 'Áudios contra momentos de fraqueza.',
+  'mentorias-e-lives': 'Descubra as estratégias exatas usadas para reverterem as situações mais difíceis.',
+};
 
 export function CourseSection({ course, activeTopicFilter }: CourseSectionProps) {
   const navigate = useNavigate();
@@ -120,15 +120,18 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
         {filteredModules.map((module) => {
           const progress = getModuleProgress(module);
           const isCompleted = progress === 100;
+          const moduleDescription = isSantuario ? santuarioModuleDescriptions[module.slug] : null;
 
           return (
             <div
               key={module.id}
-              onClick={() => handleModuleClick(module)}
-              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px] cursor-pointer group"
+              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px] group"
             >
-              {/* Thumbnail - Sem texto, apenas visual */}
-              <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden bg-zinc-800 shadow-lg">
+              {/* Thumbnail - Clicável */}
+              <div
+                onClick={() => handleModuleClick(module)}
+                className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden bg-zinc-800 shadow-lg cursor-pointer"
+              >
                 {/* Imagem */}
                 {module.thumbnail ? (
                   <img
@@ -177,24 +180,17 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                   </div>
                 )}
               </div>
+
+              {/* Descrição - APENAS para módulos do Santuário */}
+              {moduleDescription && (
+                <p className="mt-2 text-xs text-silk-400 leading-tight px-1">
+                  {moduleDescription}
+                </p>
+              )}
             </div>
           );
         })}
       </div>
-
-      {/* Descrições dos módulos - APENAS para o Santuário */}
-      {isSantuario && (
-        <div className="mt-8 space-y-3">
-          {santuarioDescriptions.map((description, index) => (
-            <div key={index} className="flex items-start gap-3">
-              <span className="text-gold text-sm mt-0.5">•</span>
-              <p className="text-silk-300 text-sm leading-relaxed">
-                {description}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }
