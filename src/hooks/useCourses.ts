@@ -12,7 +12,7 @@ export interface CourseWithModules {
   price: number;
   is_active: boolean;
   order_index: number;
-  modules?: ModuleWithLessons[];
+  course_modules?: ModuleWithLessons[];
 }
 
 export interface ModuleWithLessons {
@@ -23,7 +23,7 @@ export interface ModuleWithLessons {
   thumbnail: string;
   order_index: number;
   is_active: boolean;
-  lessons?: Lesson[];
+  course_lessons?: Lesson[];
 }
 
 export interface Lesson {
@@ -42,32 +42,54 @@ export function useCourses() {
   return useQuery({
     queryKey: ['courses'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // PASSO 1: Buscar cursos
+      const { data: courses, error: coursesError } = await supabase
         .from('courses')
-        .select(`
-          *,
-          modules:course_modules(
-            *,
-            lessons:course_lessons(*)
-          )
-        `)
+        .select('*')
         .eq('is_active', true)
         .order('order_index');
 
-      if (error) throw error;
+      if (coursesError) throw coursesError;
 
-      // Ordenar módulos e aulas
-      const coursesWithSortedData = data?.map(course => ({
-        ...course,
-        modules: course.modules
-          ?.sort((a, b) => a.order_index - b.order_index)
-          .map(module => ({
-            ...module,
-            lessons: module.lessons?.sort((a, b) => a.order_index - b.order_index) || []
-          })) || []
-      }));
+      // PASSO 2: Para cada curso, buscar módulos
+      const coursesWithModules = await Promise.all(
+        (courses || []).map(async (course) => {
+          const { data: modules, error: modulesError } = await supabase
+            .from('course_modules')
+            .select('*')
+            .eq('course_id', course.id)
+            .eq('is_active', true)
+            .order('order_index');
 
-      return coursesWithSortedData as CourseWithModules[];
+          if (modulesError) throw modulesError;
+
+          // PASSO 3: Para cada módulo, buscar aulas
+          const modulesWithLessons = await Promise.all(
+            (modules || []).map(async (module) => {
+              const { data: lessons, error: lessonsError } = await supabase
+                .from('course_lessons')
+                .select('*')
+                .eq('module_id', module.id)
+                .eq('is_active', true)
+                .order('order_index');
+
+              if (lessonsError) throw lessonsError;
+
+              return {
+                ...module,
+                course_lessons: lessons || []
+              };
+            })
+          );
+
+          return {
+            ...course,
+            course_modules: modulesWithLessons
+          };
+        })
+      );
+
+      return coursesWithModules as CourseWithModules[];
     },
   });
 }

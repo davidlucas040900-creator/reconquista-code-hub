@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, ChevronRight } from 'lucide-react';
-import { CourseWithModules } from '@/hooks/useCourses';
-import { useHasCourseAccess } from '@/hooks/useUserPurchases';
+import { Course } from '@/types';
 
 interface HeroCarouselProps {
-  courses: CourseWithModules[];
+  courses: Course[];
   autoPlayInterval?: number;
 }
 
@@ -16,8 +15,8 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Filtrar apenas cursos com acesso ou mostrar todos se nenhum comprado
-  const displayCourses = courses.length > 0 ? courses : [];
+  const purchasedCourses = courses.filter(c => c.isPurchased);
+  const displayCourses = purchasedCourses.length > 0 ? purchasedCourses : courses;
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % displayCourses.length);
@@ -30,16 +29,16 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
     return () => clearInterval(interval);
   }, [isPaused, nextSlide, autoPlayInterval, displayCourses.length]);
 
-  if (displayCourses.length === 0) {
-    return (
-      <section className="h-[70vh] md:h-[80vh] flex items-center justify-center bg-gradient-to-b from-noir-900 to-noir-950">
-        <div className="text-center">
-          <h2 className="heading-hero mb-4">Bem-vinda</h2>
-          <p className="text-body text-lg">Carregando seus cursos...</p>
-        </div>
-      </section>
-    );
-  }
+  const handleModuleClick = (course: Course) => {
+    if (course.isPurchased) {
+      navigate(`/curso/${course.slug}`);
+    } else {
+      // Navegar para página de vendas
+      window.open(`/vendas/${course.slug}`, '_blank');
+    }
+  };
+
+  if (displayCourses.length === 0) return null;
 
   return (
     <section
@@ -52,59 +51,57 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
         className="carousel-track h-full"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
-        {displayCourses.map((course) => {
-          const firstModule = course.modules?.[0];
-          
-          return (
-            <div key={course.id} className="carousel-slide h-full">
-              {/* Background Image */}
-              <div className="absolute inset-0">
-                <img
-                  src={course.thumbnail || 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=80'}
-                  alt={course.name}
-                  className="w-full h-full object-cover"
-                />
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-noir-950 via-transparent to-transparent" />
-              </div>
+        {displayCourses.map((course, index) => (
+          <div key={course.id} className="carousel-slide h-full">
+            {/* Background Image */}
+            <div className="absolute inset-0">
+              <img
+                src={course.heroImage}
+                alt={course.name}
+                className="w-full h-full object-cover"
+              />
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-noir-950 via-transparent to-transparent" />
+            </div>
 
-              {/* Content */}
-              <div className="relative z-10 h-full flex items-center">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-                  <div className="max-w-2xl">
-                    {/* Course Name */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 border border-gold/30 mb-6">
-                      <span className="text-gold text-sm font-medium">
-                        {course.name}
-                      </span>
-                    </div>
-
-                    {/* Title */}
-                    <h2 className="heading-hero mb-4">
-                      {firstModule?.name || course.name}
-                    </h2>
-
-                    {/* Description */}
-                    <p className="text-body text-lg mb-8 max-w-lg">
-                      {firstModule?.description || course.description}
-                    </p>
-
-                    {/* CTA */}
-                    <button
-                      onClick={() => navigate(`/curso/${course.slug}`)}
-                      className="btn-gold text-lg group"
-                    >
-                      <Play className="w-5 h-5" />
-                      <span>COMEÇAR AGORA</span>
-                      <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </button>
+            {/* Content */}
+            <div className="relative z-10 h-full flex items-center">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+                <div className="max-w-2xl">
+                  {/* Module Badge */}
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 border border-gold/30 mb-6">
+                    <span className="text-gold text-sm font-medium">
+                      MÓDULO {index + 1}
+                    </span>
                   </div>
+
+                  {/* Title */}
+                  <h2 className="heading-hero mb-4">
+                    {course.modules[0]?.title || course.name}
+                  </h2>
+
+                  {/* Description */}
+                  <p className="text-body text-lg mb-8 max-w-lg">
+                    {course.modules[0]?.description || course.description}
+                  </p>
+
+                  {/* CTA */}
+                  <button
+                    onClick={() => handleModuleClick(course)}
+                    className="btn-gold text-lg group"
+                  >
+                    <Play className="w-5 h-5" />
+                    <span>
+                      {course.isPurchased ? 'COMEÇAR AGORA' : 'DESBLOQUEAR ACESSO'}
+                    </span>
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
                 </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {/* Indicators */}

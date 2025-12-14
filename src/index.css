@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+   DISCOVERY HUB PREMIUM - CSS GLOBAL
+    */
+
 @layer base {
   :root {
     --noir-950: #0a0a0a;
@@ -12,9 +16,12 @@
     --gold-light: #E5C158;
     --gold-dark: #B8960F;
     --royal: #4B0082;
+    --royal-light: #6B238E;
     --silk-100: #F5F5F5;
+    --silk-200: #E0E0E0;
     --silk-300: #A0A0A0;
     --silk-400: #707070;
+    --silk-500: #555555;
   }
 
   * {
@@ -23,12 +30,16 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     @apply bg-noir-950 text-silk-100 font-montserrat overflow-x-hidden;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -43,12 +54,18 @@
     border-radius: 2px;
   }
 
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--gold);
+  }
+
   ::selection {
     background: rgba(212, 175, 55, 0.3);
+    color: var(--silk-100);
   }
 }
 
 @layer components {
+  /*  GLASSMORPHISM  */
   .glass {
     @apply bg-black/40 backdrop-blur-xl border border-white/10;
   }
@@ -61,18 +78,16 @@
     @apply bg-noir-900/60 backdrop-blur-xl border border-white/5 rounded-2xl;
   }
 
+  /*  BUTTONS  */
   .btn-gold {
     @apply inline-flex items-center justify-center gap-2
            bg-gold text-noir-950 font-semibold
            px-6 py-3 rounded-full
            hover:bg-gold-light hover:scale-105
            active:scale-100
-           transition-all duration-300 ease-out;
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
-  }
-
-  .btn-gold:hover {
-    box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+           transition-all duration-300 ease-out
+           shadow-[0_0_20px_rgba(212,175,55,0.3)]
+           hover:shadow-[0_0_30px_rgba(212,175,55,0.5)];
   }
 
   .btn-royal {
@@ -81,8 +96,8 @@
            px-6 py-3 rounded-full
            hover:bg-royal-light hover:scale-105
            active:scale-100
-           transition-all duration-300 ease-out;
-    box-shadow: 0 0 20px rgba(75, 0, 130, 0.3);
+           transition-all duration-300 ease-out
+           shadow-[0_0_20px_rgba(75,0,130,0.3)];
   }
 
   .btn-ghost {
@@ -100,6 +115,7 @@
            transition-all duration-300;
   }
 
+  /*  CARDS  */
   .card-noir {
     @apply bg-noir-900/50 border border-white/5 rounded-2xl
            hover:border-gold/20
@@ -107,24 +123,22 @@
   }
 
   .card-module {
-    @apply relative overflow-hidden rounded-xl cursor-pointer;
-    aspect-ratio: 3/4;
+    
   }
 
   .card-module-image {
-    @apply absolute inset-0 w-full h-full object-cover
-           transition-all duration-700 ease-out;
+    
   }
 
-  .card-module:hover .card-module-image {
-    transform: scale(1.05);
+  .card-module-locked {
+    @apply grayscale brightness-50;
   }
 
   .card-module-overlay {
-    @apply absolute inset-0 pointer-events-none;
-    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 40%, transparent 100%);
+    @apply absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent;
   }
 
+  /*  TYPOGRAPHY  */
   .heading-hero {
     @apply font-playfair text-4xl md:text-6xl lg:text-7xl font-bold
            text-silk-100 leading-tight tracking-tight;
@@ -147,22 +161,22 @@
   }
 
   .text-gold-gradient {
-    background: linear-gradient(to right, var(--gold-dark), var(--gold), var(--gold-light));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    @apply bg-gradient-to-r from-gold-dark via-gold to-gold-light
+           bg-clip-text text-transparent;
   }
 
+  /*  PROGRESS  */
   .progress-bar {
     @apply h-1 bg-white/10 rounded-full overflow-hidden;
   }
 
   .progress-fill {
-    @apply h-full rounded-full;
-    background: linear-gradient(to right, var(--gold-dark), var(--gold), var(--gold-light));
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    @apply h-full bg-gradient-to-r from-gold-dark via-gold to-gold-light
+           rounded-full
+           shadow-[0_0_10px_rgba(212,175,55,0.5)];
   }
 
+  /*  TOPIC FILTER  */
   .topic-chip {
     @apply flex items-center gap-2
            px-4 py-2 rounded-full
@@ -178,6 +192,7 @@
     @apply bg-gold/20 border-gold/50 text-gold;
   }
 
+  /*  CAROUSEL  */
   .carousel-hero {
     @apply relative w-full overflow-hidden;
   }
@@ -191,7 +206,8 @@
   }
 
   .carousel-indicators {
-    @apply absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20;
+    @apply absolute bottom-6 left-1/2 -translate-x-1/2
+           flex gap-2 z-20;
   }
 
   .carousel-dot {
@@ -203,28 +219,43 @@
     @apply w-8 bg-gold;
   }
 
+  /*  HORIZONTAL SCROLL  */
   .scroll-container {
-    @apply flex gap-4 overflow-x-auto pb-4 -mb-4;
+    @apply flex gap-4 overflow-x-auto
+           scrollbar-hide snap-x snap-mandatory
+           pb-4 -mb-4;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .scroll-container::-webkit-scrollbar {
-    display: none;
   }
 
   .scroll-item {
-    @apply flex-shrink-0;
+    @apply flex-shrink-0 snap-start;
   }
 
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /*  LOCK OVERLAY  */
+  .lock-overlay {
+    @apply absolute inset-0 flex items-center justify-center
+           bg-black/60 backdrop-blur-sm rounded-xl;
+  }
+
+  .lock-icon {
+    @apply w-12 h-12 text-gold/80
+           drop-shadow-[0_0_10px_rgba(212,175,55,0.5)];
+  }
+
+  /*  BOTTOM NAV  */
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 z-50
-           px-4 py-2 md:hidden;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+           glass border-t border-white/10
+           px-4 py-2 pb-safe
+           md:hidden;
   }
 
   .bottom-nav-item {
@@ -235,8 +266,49 @@
   }
 
   .bottom-nav-item-active {
-    @apply text-gold;
-    background: rgba(212, 175, 55, 0.1);
+    @apply text-gold bg-gold/10;
+  }
+
+  /*  WHATSAPP FAB  */
+  .whatsapp-fab {
+    @apply fixed left-5 bottom-24 md:bottom-8 z-50
+           w-14 h-14 rounded-full
+           bg-[#25D366] text-white
+           flex items-center justify-center
+           shadow-[0_4px_20px_rgba(37,211,102,0.4)]
+           hover:scale-110 hover:shadow-[0_4px_30px_rgba(37,211,102,0.6)]
+           transition-all duration-300
+           animate-pulse;
+  }
+
+  /*  ANIMATIONS  */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes pulse-gold {
+    0%, 100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
+    50% { box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    background-size: 200% 100%;
+  }
+
+  .animate-pulse-gold {
+    animation: pulse-gold 2s ease-in-out infinite;
   }
 }
 
@@ -248,4 +320,9 @@
   .text-responsive-section {
     font-size: clamp(1.5rem, 4vw, 2.5rem);
   }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  }
 }
+

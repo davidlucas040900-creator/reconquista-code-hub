@@ -2,41 +2,22 @@
 
 import { useNavigate } from 'react-router-dom';
 import { Lock, ChevronRight } from 'lucide-react';
-import { CourseWithModules } from '@/hooks/useCourses';
-import { LessonProgress } from '@/hooks/useUserProgress';
-import { useHasCourseAccess } from '@/hooks/useUserPurchases';
+import { Course } from '@/types';
 
 interface CourseSectionProps {
-  course: CourseWithModules;
-  userProgress: LessonProgress[];
+  course: Course;
 }
 
-export function CourseSection({ course, userProgress }: CourseSectionProps) {
+export function CourseSection({ course }: CourseSectionProps) {
   const navigate = useNavigate();
-  const hasAccess = useHasCourseAccess(course.slug);
 
-  const handleModuleClick = (moduleId: string) => {
-    if (!hasAccess) {
+  const handleModuleClick = (moduleId: string, isLocked: boolean) => {
+    if (isLocked) {
       // Navegar para página de vendas
       window.open(`/vendas/${course.slug}`, '_blank');
     } else {
       navigate(`/curso/${course.slug}?module=${moduleId}`);
     }
-  };
-
-  // Calcular progresso de cada módulo
-  const getModuleProgress = (moduleId: string) => {
-    const module = course.modules?.find(m => m.id === moduleId);
-    if (!module || !module.lessons) return 0;
-
-    const totalLessons = module.lessons.length;
-    if (totalLessons === 0) return 0;
-
-    const completedLessons = module.lessons.filter(lesson =>
-      userProgress.find(p => p.lesson_id === lesson.id && p.is_completed)
-    ).length;
-
-    return Math.round((completedLessons / totalLessons) * 100);
   };
 
   return (
@@ -46,10 +27,10 @@ export function CourseSection({ course, userProgress }: CourseSectionProps) {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="heading-section">{course.name}</h2>
-            <p className="text-body mt-1">{course.description}</p>
+            <p className="text-body mt-1">{course.tagline}</p>
           </div>
           
-          {hasAccess && (
+          {course.isPurchased && (
             <button
               onClick={() => navigate(`/curso/${course.slug}`)}
               className="btn-ghost hidden md:flex items-center gap-2"
@@ -62,21 +43,23 @@ export function CourseSection({ course, userProgress }: CourseSectionProps) {
 
         {/* Modules Slider */}
         <div className="scroll-container">
-          {course.modules?.map((module) => {
-            const isLocked = !hasAccess;
-            const progress = getModuleProgress(module.id);
+          {course.modules.map((module) => {
+            const isLocked = !course.isPurchased || module.isLocked;
+            const progress = module.lessonsCount > 0
+              ? (module.completedLessons / module.lessonsCount) * 100
+              : 0;
 
             return (
               <button
                 key={module.id}
-                onClick={() => handleModuleClick(module.id)}
+                onClick={() => handleModuleClick(module.id, isLocked)}
                 className="scroll-item w-40 md:w-48"
               >
                 <div className="card-module">
                   {/* Image */}
                   <img
-                    src={module.thumbnail || 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=800&q=80'}
-                    alt={module.name}
+                    src={module.image}
+                    alt={module.title}
                     className={`card-module-image ${isLocked ? 'card-module-locked' : ''}`}
                   />
 
@@ -94,18 +77,11 @@ export function CourseSection({ course, userProgress }: CourseSectionProps) {
                   {!isLocked && progress > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
                       <div
-                        className="h-full bg-gold transition-all duration-500"
+                        className="h-full bg-gold"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
                   )}
-
-                  {/* Module Title (hover) */}
-                  <div className="absolute inset-x-0 bottom-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <p className="text-white text-sm font-semibold line-clamp-2">
-                      {module.name}
-                    </p>
-                  </div>
                 </div>
               </button>
             );
