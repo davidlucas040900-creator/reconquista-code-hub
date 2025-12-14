@@ -296,3 +296,23 @@ textarea:focus {
   color: white !important;
   -webkit-text-fill-color: white !important;
 }
+
+/* ============================================
+   FIX: INPUTS SEMPRE VISÍVEIS
+   ============================================ */
+input[type="email"],input[type="password"],input[type="text"],input[type="number"],input[type="tel"],textarea,select {
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}
+input::placeholder,textarea::placeholder {
+  color: rgb(156 163 175) !important;
+  opacity: 1 !important;
+}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1a1a1a inset !important;
+  -webkit-text-fill-color: white !important;
+  caret-color: white !important;
+}
+input,textarea {
+  caret-color: white !important;
+}
