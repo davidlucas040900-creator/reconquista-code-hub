@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLessonData, getNextLesson, getPreviousLesson, getModuleLessons } from '@/data/lessons';
@@ -21,7 +21,7 @@ export default function Lesson() {
   const moduleNumber = parseInt(params.moduleId || '0');
   const lessonNumber = parseInt(params.lessonId || '0');
 
-  // Verificar autenticaÃ§Ã£o
+  // Verificar autenticação
   useEffect(() => {
     if (!loading && !user) {
       navigate('/login');
@@ -33,7 +33,7 @@ export default function Lesson() {
     const data = getLessonData(moduleNumber, lessonNumber);
 
     if (!data) {
-      toast.error('Aula nÃ£o encontrada');
+      toast.error('Aula não encontrada');
       navigate('/dashboard');
       return;
     }
@@ -41,7 +41,7 @@ export default function Lesson() {
     setLesson(data);
   }, [moduleNumber, lessonNumber]);
 
-  // Calcular progresso do mÃ³dulo
+  // Calcular progresso do módulo
   useEffect(() => {
     const calculateModuleProgress = async () => {
       if (!user) return;
@@ -49,7 +49,7 @@ export default function Lesson() {
       const moduleLessons = getModuleLessons(moduleNumber);
 
       const { data } = await supabase
-        .from('user_lesson_progress')
+        .from('user_lessons')
         .select('is_completed')
         .eq('user_id', user.id)
         .eq('is_completed', true);
@@ -68,7 +68,7 @@ export default function Lesson() {
     if (!user || !lesson) return;
 
     // Salvar progresso no Supabase
-    await supabase.from('user_lesson_progress').upsert({
+    await supabase.from('user_lessons').upsert({
       user_id: user.id,
       module_id: moduleNumber,
       lesson_id: lessonNumber,
@@ -81,7 +81,7 @@ export default function Lesson() {
   const handleComplete = async () => {
     if (!user || !lesson) return;
 
-    await supabase.from('user_lesson_progress').upsert({
+    await supabase.from('user_lessons').upsert({
       user_id: user.id,
       module_id: moduleNumber,
       lesson_id: lessonNumber,
@@ -91,8 +91,8 @@ export default function Lesson() {
       onConflict: 'user_id,module_id,lesson_id'
     });
 
-    toast.success('ðŸŽ‰ Aula concluÃ­da!', {
-      description: 'ParabÃ©ns por mais uma conquista!',
+    toast.success('🎉 Aula concluída!', {
+      description: 'Parabéns por mais uma conquista!',
     });
   };
 
@@ -123,14 +123,14 @@ export default function Lesson() {
               </div>
               <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
                 <BookOpen className="h-4 w-4" />
-                <span>MÃ³dulo {moduleNumber}</span>
-                <span>â€¢</span>
+                <span>Módulo {moduleNumber}</span>
+                <span>•</span>
                 <span>Aula {lessonNumber}</span>
                 {lesson.isBonus && (
                   <>
-                    <span>â€¢</span>
+                    <span>•</span>
                     <span className="rounded bg-purple-500/20 px-2 py-0.5 text-xs font-semibold text-purple-400">
-                      BÃ“NUS
+                      BÓNUS
                     </span>
                   </>
                 )}
@@ -210,7 +210,7 @@ export default function Lesson() {
                   className="min-w-[200px] flex-1 gap-2"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Voltar ao InÃ­cio
+                  Voltar ao Início
                 </Button>
               )}
 
@@ -219,7 +219,7 @@ export default function Lesson() {
                   onClick={() => navigate(`/modulo/${nextLesson.module}/aula/${nextLesson.lesson}`)}
                   className="min-w-[200px] flex-1 gap-2 bg-primary font-semibold hover:bg-primary/90"
                 >
-                  PrÃ³xima Aula
+                  Próxima Aula
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               )}
@@ -235,4 +235,3 @@ export default function Lesson() {
     </div>
   );
 }
-

@@ -1,0 +1,3248 @@
+﻿================================================================================
+ANÁLISE COMPLETA DO BACKEND - RECONQUISTA CODE HUB
+Data: 13/12/2025 17:43:07
+================================================================================
+
+
+========================================
+ARQUIVO: supabase/functions/lojou-webhook/index.ts
+========================================
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+const DEFAULT_PASSWORD = 'Reconquista@2026'
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const payload = await req.json()
+    console.log('=== WEBHOOK LOJOU ===', JSON.stringify(payload, null, 2))
+
+    const transactionId = payload.id || payload.ID || payload.transaction_id || `TXN-${Date.now()}`
+    const customerName = payload.nome_cliente || payload.nome || payload.name || 'Cliente'
+    const productName = payload.produto || payload.product || ''
+    const price = parseFloat(payload.preco || payload.price || payload.valor || 0)
+    const fee = parseFloat(payload.taxa || payload.fee || 0)
+    const status = (payload.status || 'aprovado').toLowerCase()
+    const whatsapp = payload.whatsapp || payload.phone || payload.telefone || ''
+    const email = (payload.email || payload.Email || '').toLowerCase().trim()
+
+    if (!email) {
+      return new Response(
+        JSON.stringify({ error: 'Email obrigatÃ³rio' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const approvedStatuses = ['aprovado', 'approved', 'paid', 'pago', 'completed', 'complete', 'success']
+    if (!approvedStatuses.includes(status)) {
+      return new Response(
+        JSON.stringify({ message: 'Status ignorado', status }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { data: existingPurchase } = await supabaseAdmin
+      .from('purchases')
+      .select('id')
+      .eq('lojou_transaction_id', transactionId)
+      .maybeSingle()
+
+    if (existingPurchase) {
+      return new Response(
+        JSON.stringify({ message: 'TransaÃ§Ã£o jÃ¡ processada' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    let userId: string
+    let isNewUser = false
+
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = users?.find(u => u.email?.toLowerCase() === email)
+
+    if (existingUser) {
+      userId = existingUser.id
+    } else {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: DEFAULT_PASSWORD,
+        email_confirm: true,
+        user_metadata: { full_name: customerName, whatsapp: whatsapp }
+      })
+
+      if (createError) throw createError
+      userId = newUser.user.id
+      isNewUser = true
+    }
+
+    await supabaseAdmin.from('profiles').upsert({
+      id: userId,
+      email: email,
+      full_name: customerName,
+      whatsapp: whatsapp,
+      has_full_access: true,
+      subscription_tier: 'premium',
+      purchase_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+    const { data: product } = await supabaseAdmin
+      .from('products')
+      .select('id')
+      .eq('lojou_product_name', productName)
+      .maybeSingle()
+
+    await supabaseAdmin.from('purchases').insert({
+      user_id: userId,
+      profile_id: userId,
+      product_id: product?.id || null,
+      lojou_transaction_id: transactionId,
+      lojou_product_name: productName,
+      amount: price,
+      fee: fee,
+      status: 'active',
+      customer_email: email,
+      customer_name: customerName,
+      customer_whatsapp: whatsapp,
+      raw_payload: payload,
+    })
+
+    const token = crypto.randomUUID() + '-' + Date.now().toString(36)
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+    await supabaseAdmin.from('magic_links').insert({
+      user_id: userId,
+      token: token,
+      expires_at: expiresAt.toISOString(),
+    })
+
+    const SITE_URL = Deno.env.get('SITE_URL') || 'https://www.codigodareconquista.xyz'
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const magicLink = `${SITE_URL}/auto-login?token=${token}`
+
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'CÃ³digo da Reconquista <acesso@codigodareconquista.xyz>',
+          to: email,
+          subject: isNewUser 
+            ? 'ðŸŽ‰ Bem-vinda! Seu acesso estÃ¡ liberado!'
+            : 'ðŸš€ Compra confirmada!',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #7c3aed; margin: 0;">ðŸŽ‰ ParabÃ©ns${customerName ? ', ' + customerName.split(' ')[0] : ''}!</h1>
+              </div>
+              
+              <p>Sua compra do <strong>${productName}</strong> foi aprovada!</p>
+              
+              <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 25px 0;">
+                <a href="${magicLink}" 
+                   style="display: inline-block; background: white; color: #7c3aed; 
+                          padding: 15px 40px; text-decoration: none; border-radius: 8px;
+                          font-weight: bold; font-size: 16px;">
+                  ACESSAR ÃREA DE MEMBROS
+                </a>
+              </div>
+
+              ${isNewUser ? `
+              <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <p style="margin: 0 0 10px; font-weight: bold;">ðŸ“§ Seus dados de acesso:</p>
+                <p style="margin: 5px 0;">Email: <strong>${email}</strong></p>
+                <p style="margin: 5px 0;">Senha: <strong>${DEFAULT_PASSWORD}</strong></p>
+              </div>
+              ` : ''}
+
+              <p style="color: #666; font-size: 14px;">
+                O botÃ£o acima te leva direto para a Ã¡rea de membros.<br>
+                VocÃª tambÃ©m pode acessar pelo site usando seu email e senha.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+              
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                CÃ³digo da Reconquista Â© ${new Date().getFullYear()}
+              </p>
+              
+            </body>
+            </html>
+          `
+        })
+      })
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: isNewUser ? 'UsuÃ¡rio criado' : 'Compra registrada',
+        user_id: userId,
+        is_new_user: isNewUser,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Erro:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+})
+
+
+========================================
+ARQUIVO: supabase/functions/request-access/index.ts
+========================================
+
+// supabase/functions/request-access/index.ts
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const { email } = await req.json()
+
+    if (!email) {
+      return new Response(
+        JSON.stringify({ error: 'Email Ã© obrigatÃ³rio' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Verificar se o usuÃ¡rio existe
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+
+    if (!existingUser) {
+      // NÃ£o revelar se o email existe ou nÃ£o (seguranÃ§a)
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Se este email estiver cadastrado, vocÃª receberÃ¡ um link de acesso.' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verificar se tem acesso (comprou algum produto)
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('has_full_access, full_name')
+      .eq('id', existingUser.id)
+      .single()
+
+    if (!profile?.has_full_access) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Se este email estiver cadastrado, vocÃª receberÃ¡ um link de acesso.' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Gerar novo magic link
+    const token = crypto.randomUUID() + '-' + Date.now().toString(36)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
+
+    await supabaseAdmin.from('magic_links').insert({
+      user_id: existingUser.id,
+      token: token,
+      expires_at: expiresAt.toISOString(),
+    })
+
+    // Enviar email
+    const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const magicLink = `${SITE_URL}/auto-login?token=${token}`
+    const firstName = profile.full_name?.split(' ')[0] || 'Aluna'
+
+    if (RESEND_API_KEY) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'CÃ³digo da Reconquista <acesso@codigodareconquista.xyz>',
+          to: email,
+          subject: 'ðŸ” Seu link de acesso estÃ¡ aqui!',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+              
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #18181b; margin: 0; font-size: 24px;">
+                  OlÃ¡, ${firstName}!
+                </h1>
+              </div>
+              
+              <p style="color: #52525b;">
+                VocÃª solicitou acesso Ã  sua Ã¡rea de membros. 
+                Clique no botÃ£o abaixo para entrar:
+              </p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${magicLink}" 
+                   style="display: inline-block; background: #18181b; color: white; 
+                          padding: 14px 32px; text-decoration: none; border-radius: 8px;
+                          font-weight: 500; font-size: 16px;">
+                  Acessar Ãrea de Membros
+                </a>
+              </div>
+
+              <p style="color: #71717a; font-size: 14px;">
+                Este link expira em 24 horas.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 30px 0;">
+              
+              <p style="color: #a1a1aa; font-size: 12px; text-align: center;">
+                Se vocÃª nÃ£o solicitou este acesso, ignore este email.
+              </p>
+              
+            </body>
+            </html>
+          `
+        })
+      })
+
+      // Log de acesso
+      await supabaseAdmin.from('access_logs').insert({
+        user_id: existingUser.id,
+        action: 'request_access',
+        metadata: { email, token_generated: true }
+      })
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Link de acesso enviado para seu email!' 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Erro:', error)
+    return new Response(
+      JSON.stringify({ error: 'Erro interno do servidor' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+})
+
+
+
+========================================
+ARQUIVO: src/integrations/supabase/client.ts
+========================================
+
+// This file is automatically generated. Do not edit it directly.
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from './types';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Import the supabase client like this:
+// import { supabase } from "@/integrations/supabase/client";
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
+
+
+
+========================================
+ARQUIVO: src/integrations/supabase/types.ts
+========================================
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
+  public: {
+    Tables: {
+      notification_logs: {
+        Row: {
+          body: string
+          clicked: boolean | null
+          clicked_at: string | null
+          id: string
+          sent_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          clicked?: boolean | null
+          clicked_at?: string | null
+          id?: string
+          sent_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          clicked?: boolean | null
+          clicked_at?: string | null
+          id?: string
+          sent_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          first_login_completed: boolean | null
+          full_name: string | null
+          id: string
+          subscription_expires_at: string | null
+          subscription_tier: string | null
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          first_login_completed?: boolean | null
+          full_name?: string | null
+          id: string
+          subscription_expires_at?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          first_login_completed?: boolean | null
+          full_name?: string | null
+          id?: string
+          subscription_expires_at?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          subscription: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          subscription: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          subscription?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_lessons: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean | null
+          lesson_id: number
+          lesson_number: number | null
+          module_id: number
+          updated_at: string
+          user_id: string
+          watch_percentage: number | null
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          lesson_id: number
+          lesson_number?: number | null
+          module_id: number
+          updated_at?: string
+          user_id: string
+          watch_percentage?: number | null
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          lesson_id?: number
+          lesson_number?: number | null
+          module_id?: number
+          updated_at?: string
+          user_id?: string
+          watch_percentage?: number | null
+        }
+        Relationships: []
+      }
+      user_modules: {
+        Row: {
+          created_at: string
+          id: string
+          is_completed: boolean
+          is_released: boolean
+          module_name: string
+          module_number: number
+          release_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          is_released?: boolean
+          module_name: string
+          module_number: number
+          release_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          is_released?: boolean
+          module_name?: string
+          module_number?: number
+          release_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_stats: {
+        Row: {
+          created_at: string | null
+          current_streak_days: number | null
+          id: string
+          last_activity_date: string | null
+          lessons_completed: number | null
+          longest_streak_days: number | null
+          modules_completed: number | null
+          total_watch_time_minutes: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_streak_days?: number | null
+          id?: string
+          last_activity_date?: string | null
+          lessons_completed?: number | null
+          longest_streak_days?: number | null
+          modules_completed?: number | null
+          total_watch_time_minutes?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_streak_days?: number | null
+          id?: string
+          last_activity_date?: string | null
+          lessons_completed?: number | null
+          longest_streak_days?: number | null
+          modules_completed?: number | null
+          total_watch_time_minutes?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      release_modules: { Args: never; Returns: undefined }
+    }
+    Enums: {
+      app_role: "admin" | "user"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "user"],
+    },
+  },
+} as const
+
+
+
+========================================
+ARQUIVO: src/contexts/AuthContext.tsx
+========================================
+
+"use client";
+
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    whatsapp: string
+  ) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    // Check for existing session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    });
+
+    // Set up auth state listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, fullName: string, whatsapp: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/login`;
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+            whatsapp: whatsapp,
+          },
+        },
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const value = {
+    user,
+    session,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+
+
+========================================
+ARQUIVO: src/hooks/useAdmin.ts
+========================================
+
+// src/hooks/useAdmin.ts
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+export function useAdmin() {
+  const { user, loading: authLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      setIsAdmin(data?.role === 'admin');
+      setLoading(false);
+    };
+
+    if (!authLoading) {
+      checkAdmin();
+    }
+  }, [user, authLoading]);
+
+  return { isAdmin, loading: loading || authLoading, user };
+}
+
+
+
+========================================
+ARQUIVO: src/pages/Login.tsx
+========================================
+
+// src/pages/Login.tsx - VERSÃƒO MINIMALISTA COM RELOGIN
+
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, Mail, ArrowRight } from 'lucide-react';
+
+type LoginMode = 'choose' | 'email-login' | 'request-access' | 'access-sent';
+
+const Login = () => {
+  const [mode, setMode] = useState<LoginMode>('choose');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { signIn, user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
+
+  // Login com email e senha
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const { error } = await signIn(email, password);
+
+    if (!error) {
+      toast.success('Bem-vinda de volta!');
+      navigate('/dashboard');
+    } else {
+      toast.error('Email ou senha incorretos');
+    }
+    
+    setIsLoading(false);
+  };
+
+  // Solicitar link de acesso (sem senha)
+  const handleRequestAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/request-access`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMode('access-sent');
+      } else {
+        toast.error(data.error || 'Erro ao solicitar acesso');
+      }
+    } catch (error) {
+      toast.error('Erro ao conectar com o servidor');
+    }
+
+    setIsLoading(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-8">
+        
+        {/* Logo */}
+        <div className="text-center">
+          <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-background font-bold text-lg">
+            CR
+          </div>
+          <h1 className="text-xl font-semibold text-foreground">
+            CÃ³digo da Reconquista
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ãrea de Membros
+          </p>
+        </div>
+
+        {/* Escolha Inicial */}
+        {mode === 'choose' && (
+          <div className="space-y-4">
+            <Button
+              onClick={() => setMode('request-access')}
+              className="w-full h-12 text-base font-medium"
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Receber link de acesso
+            </Button>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  ou
+                </span>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setMode('email-login')}
+              className="w-full h-12 text-base font-medium"
+            >
+              Entrar com senha
+            </Button>
+          </div>
+        )}
+
+        {/* Solicitar Link de Acesso */}
+        {mode === 'request-access' && (
+          <form onSubmit={handleRequestAccess} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Qual Ã© o seu email?
+              </label>
+              <Input
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12"
+                autoFocus
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 text-base font-medium"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Enviar link de acesso
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+
+            <button
+              type="button"
+              onClick={() => setMode('choose')}
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              â† Voltar
+            </button>
+          </form>
+        )}
+
+        {/* Link Enviado */}
+        {mode === 'access-sent' && (
+          <div className="text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <Mail className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+            
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Verifique seu email
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Enviamos um link de acesso para<br />
+                <span className="font-medium text-foreground">{email}</span>
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              O link expira em 24 horas
+            </p>
+
+            <button
+              onClick={() => {
+                setEmail('');
+                setMode('choose');
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Usar outro email
+            </button>
+          </div>
+        )}
+
+        {/* Login com Senha */}
+        {mode === 'email-login' && (
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Email
+              </label>
+              <Input
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Senha
+              </label>
+              <Input
+                type="password"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="h-12"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 text-base font-medium"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Entrar'
+              )}
+            </Button>
+
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setMode('choose')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                â† Voltar
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setMode('request-access')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Esqueci a senha
+              </button>
+            </div>
+          </form>
+        )}
+
+      </div>
+
+      {/* Footer */}
+      <p className="mt-12 text-xs text-muted-foreground">
+        Â© {new Date().getFullYear()} CÃ³digo da Reconquista
+      </p>
+    </div>
+  );
+};
+
+export default Login;
+
+
+
+========================================
+ARQUIVO: src/pages/AutoLogin.tsx
+========================================
+
+// src/pages/AutoLogin.tsx
+
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+const AutoLogin = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('A verificar o teu acesso...');
+
+  useEffect(() => {
+    const processAutoLogin = async () => {
+      const token = searchParams.get('token');
+
+      if (!token) {
+        setStatus('error');
+        setMessage('Link invÃ¡lido. Token nÃ£o encontrado.');
+        setTimeout(() => navigate('/login'), 3000);
+        return;
+      }
+
+      try {
+        // 1. Verificar se o token existe e Ã© vÃ¡lido
+        const { data: magicLink, error: linkError } = await supabase
+          .from('magic_links')
+          .select('*')
+          .eq('token', token)
+          .is('used_at', null)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+
+        if (linkError || !magicLink) {
+          setStatus('error');
+          setMessage('Link expirado ou jÃ¡ utilizado. Faz login normalmente.');
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+
+        // 2. Buscar dados do usuÃ¡rio
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', magicLink.user_id)
+          .single();
+
+        if (profileError || !profile) {
+          setStatus('error');
+          setMessage('UsuÃ¡rio nÃ£o encontrado.');
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+
+        // 3. Fazer login com a senha padrÃ£o
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password: 'Reconquista@2026',
+        });
+
+        if (signInError) {
+          console.error('Erro no auto-login:', signInError);
+          setStatus('error');
+          setMessage('Erro ao fazer login. Tenta manualmente.');
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+
+        // 4. Marcar token como usado
+        await supabase
+          .from('magic_links')
+          .update({ used_at: new Date().toISOString() })
+          .eq('token', token);
+
+        // 5. Sucesso!
+        setStatus('success');
+        setMessage('Acesso confirmado! A redirecionar...');
+        toast.success('Bem-vinda Ã  Ã¡rea de membros! ðŸŽ‰');
+        
+        setTimeout(() => navigate('/dashboard'), 1500);
+
+      } catch (error) {
+        console.error('Erro no auto-login:', error);
+        setStatus('error');
+        setMessage('Erro inesperado. Tenta novamente.');
+        setTimeout(() => navigate('/login'), 3000);
+      }
+    };
+
+    processAutoLogin();
+  }, [searchParams, navigate]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-background/95">
+      <div className="text-center space-y-6 p-8">
+        {/* Loading spinner */}
+        {status === 'loading' && (
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent mx-auto" />
+        )}
+
+        {/* Success icon */}
+        {status === 'success' && (
+          <div className="text-6xl animate-bounce">ðŸŽ‰</div>
+        )}
+
+        {/* Error icon */}
+        {status === 'error' && (
+          <div className="text-6xl">ðŸ˜•</div>
+        )}
+
+        <h1 className="text-2xl font-bold text-foreground">
+          {status === 'loading' && 'A processar...'}
+          {status === 'success' && 'Bem-vinda!'}
+          {status === 'error' && 'Ops!'}
+        </h1>
+
+        <p className="text-muted-foreground">{message}</p>
+
+        {status === 'error' && (
+          <button
+            onClick={() => navigate('/login')}
+            className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+          >
+            Ir para Login
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AutoLogin;
+
+
+
+========================================
+ARQUIVO: src/data/mockData.ts
+========================================
+
+// src/data/mockData.ts
+
+import { Course, Topic, User, UserProgress } from '@/types';
+
+// 
+// USUÁRIO MOCKADO
+// 
+export const mockUser: User = {
+  id: '1',
+  name: 'Maria',
+  email: 'maria@email.com',
+  purchasedCourses: ['codigo-reconquista'], // Apenas este comprado
+  lastLesson: {
+    courseSlug: 'codigo-reconquista',
+    moduleId: 'm2',
+    lessonId: 'l5',
+    title: 'A Técnica do Silêncio Estratégico'
+  }
+};
+
+// 
+// TÓPICOS DE FILTRO
+// 
+export const topics: Topic[] = [
+  { id: 'all', name: 'Todos', icon: '', gradient: 'from-gold/20 to-gold/5' },
+  { id: 'reconquista', name: 'Reconquista', icon: '', gradient: 'from-purple-500/20 to-purple-500/5' },
+  { id: 'psicologia', name: 'Psicologia Masculina', icon: '', gradient: 'from-blue-500/20 to-blue-500/5' },
+  { id: 'confianca', name: 'Confiança', icon: '', gradient: 'from-amber-500/20 to-amber-500/5' },
+  { id: 'seducao', name: 'Sedução', icon: '', gradient: 'from-red-500/20 to-red-500/5' },
+  { id: 'comunicacao', name: 'Comunicação', icon: '', gradient: 'from-green-500/20 to-green-500/5' },
+  { id: 'sexo', name: 'Sexo', icon: '', gradient: 'from-pink-500/20 to-pink-500/5' },
+];
+
+// 
+// CURSOS COMPLETOS
+// 
+export const courses: Course[] = [
+  {
+    id: 'c1',
+    slug: 'codigo-reconquista',
+    name: 'Código da Reconquista',
+    tagline: 'O método definitivo para reconquistar quem você ama',
+    description: 'Aprende a parar de agir pela emoção e assume o controle.',
+    heroImage: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=80',
+    isPurchased: true,
+    topics: ['reconquista', 'psicologia', 'comunicacao'],
+    modules: [
+      {
+        id: 'm1',
+        title: 'RESET EMOCIONAL',
+        description: 'Aprende a parar de agir pela emoção e assume o controle.',
+        image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=800&q=80',
+        lessonsCount: 8,
+        completedLessons: 8,
+        isLocked: false,
+        order: 1
+      },
+      {
+        id: 'm2',
+        title: 'A ARTE DO SILÊNCIO',
+        description: 'O poder do distanciamento estratégico na reconquista.',
+        image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80',
+        lessonsCount: 6,
+        completedLessons: 4,
+        isLocked: false,
+        order: 2
+      },
+      {
+        id: 'm3',
+        title: 'RECONEXÃO MAGNÉTICA',
+        description: 'Técnicas para reacender a atração de forma natural.',
+        image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800&q=80',
+        lessonsCount: 7,
+        completedLessons: 0,
+        isLocked: false,
+        order: 3
+      },
+      {
+        id: 'm4',
+        title: 'GATILHOS EMOCIONAIS',
+        description: 'Como despertar emoções profundas e memoráveis.',
+        image: 'https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=800&q=80',
+        lessonsCount: 5,
+        completedLessons: 0,
+        isLocked: false,
+        order: 4
+      },
+      {
+        id: 'm5',
+        title: 'O REENCONTRO',
+        description: 'Preparação para o momento decisivo do retorno.',
+        image: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&q=80',
+        lessonsCount: 6,
+        completedLessons: 0,
+        isLocked: false,
+        order: 5
+      },
+      {
+        id: 'm6',
+        title: 'BLINDAGEM DEFINITIVA',
+        description: 'Como manter a relação forte para sempre.',
+        image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800&q=80',
+        lessonsCount: 7,
+        completedLessons: 0,
+        isLocked: false,
+        order: 6
+      },
+    ]
+  },
+  {
+    id: 'c2',
+    slug: 'deusa-na-cama',
+    name: 'A Deusa na Cama',
+    tagline: 'Domine a arte da sedução e do prazer',
+    description: 'Prepara-te para dominar o desejo e se tornar inesquecível.',
+    heroImage: 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=1920&q=80',
+    isPurchased: false,
+    topics: ['seducao', 'sexo', 'confianca'],
+    modules: [
+      {
+        id: 'dm1',
+        title: 'MENTALIDADE DE DEUSA',
+        description: 'Construa a autoconfiança inabalável.',
+        image: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&q=80',
+        lessonsCount: 6,
+        completedLessons: 0,
+        isLocked: true,
+        order: 1
+      },
+      {
+        id: 'dm2',
+        title: 'A ARTE DA SEDUÇÃO',
+        description: 'Técnicas para despertar o desejo.',
+        image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=80',
+        lessonsCount: 8,
+        completedLessons: 0,
+        isLocked: true,
+        order: 2
+      },
+      {
+        id: 'dm3',
+        title: 'PRAZER SEM LIMITES',
+        description: 'Descubra o poder do prazer consciente.',
+        image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&q=80',
+        lessonsCount: 10,
+        completedLessons: 0,
+        isLocked: true,
+        order: 3
+      },
+    ]
+  },
+  {
+    id: 'c3',
+    slug: 'santuario',
+    name: 'O Santuário',
+    tagline: 'O círculo exclusivo dos 1%',
+    description: 'Bem-vinda ao Círculo do 1%. O teu poder é ilimitado.',
+    heroImage: 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=1920&q=80',
+    isPurchased: false,
+    topics: ['confianca', 'psicologia', 'seducao'],
+    modules: [
+      {
+        id: 'sm1',
+        title: 'CÍRCULO INTERNO',
+        description: 'Acesso ao grupo exclusivo de elite.',
+        image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&q=80',
+        lessonsCount: 4,
+        completedLessons: 0,
+        isLocked: true,
+        order: 1
+      },
+      {
+        id: 'sm2',
+        title: 'MENTORIAS AO VIVO',
+        description: 'Sessões semanais de transformação.',
+        image: 'https://images.unsplash.com/photo-1515169067868-5387ec356754?w=800&q=80',
+        lessonsCount: 12,
+        completedLessons: 0,
+        isLocked: true,
+        order: 2
+      },
+    ]
+  }
+];
+
+// 
+// PROGRESSO DO USUÁRIO
+// 
+export const userProgress: UserProgress[] = [
+  {
+    odId: 'c1',
+    odSlug: 'codigo-reconquista',
+    moduleId: 'm1',
+    lessonId: 'l8',
+    lessonTitle: 'Reset Completo',
+    percentage: 100
+  },
+  {
+    odId: 'c1',
+    odSlug: 'codigo-reconquista',
+    moduleId: 'm2',
+    lessonId: 'l4',
+    lessonTitle: 'A Técnica do Silêncio',
+    percentage: 67
+  }
+];
+
+// 
+// HELPER FUNCTIONS
+// 
+export const getCourseProgress = (courseSlug: string): number => {
+  const course = courses.find(c => c.slug === courseSlug);
+  if (!course) return 0;
+  
+  const totalLessons = course.modules.reduce((sum, m) => sum + m.lessonsCount, 0);
+  const completedLessons = course.modules.reduce((sum, m) => sum + m.completedLessons, 0);
+  
+  return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+};
+
+export const getWelcomeMessage = (courseSlug: string): string => {
+  const messages: Record<string, string> = {
+    'codigo-reconquista': 'Bem-vinda à tua virada de jogo. O caminho da reconquista começa agora.',
+    'deusa-na-cama': 'Bem-vinda, Deusa. Prepara-te para dominar o desejo.',
+    'santuario': 'Bem-vinda ao Círculo do 1%. O teu poder é ilimitado.',
+  };
+  return messages[courseSlug] || 'Bem-vinda à sua jornada de transformação.';
+};
+
+
+
+========================================
+ARQUIVO: src/pages/Dashboard.tsx
+========================================
+
+// src/pages/Dashboard.tsx
+
+import { useState } from 'react';
+import { Header } from '@/components/layout/Header';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { HeroCarousel } from '@/components/dashboard/HeroCarousel';
+import { TopicFilter } from '@/components/dashboard/TopicFilter';
+import { ProgressSection } from '@/components/dashboard/ProgressSection';
+import { CourseSection } from '@/components/dashboard/CourseSection';
+import { courses, topics, mockUser } from '@/data/mockData';
+
+export default function Dashboard() {
+  // Estado para filtrar MÓDULOS (não cursos)
+  const [activeTopic, setActiveTopic] = useState('all');
+
+  return (
+    <div className="min-h-screen bg-noir-950">
+      {/* Header Fixo */}
+      <Header />
+
+      {/* Main Content */}
+      <main className="pt-16 pb-24 md:pb-8">
+        
+        {/*  HERO CAROUSEL  */}
+        <HeroCarousel courses={courses} />
+
+        {/*  PROGRESS SECTION  */}
+        <ProgressSection user={mockUser} courses={courses} />
+
+        {/*  FILTRO DE TÓPICOS - FILTRA MÓDULOS  */}
+        <TopicFilter
+          topics={topics}
+          activeTopic={activeTopic}
+          onTopicChange={setActiveTopic}
+        />
+
+        {/*  COURSE SECTIONS (Todos os cursos, módulos filtrados)  */}
+        {courses.map((course) => (
+          <CourseSection 
+            key={course.id} 
+            course={course} 
+            activeTopicFilter={activeTopic}
+          />
+        ))}
+      </main>
+
+      {/* Bottom Navigation (Mobile Only) */}
+      <BottomNav />
+    </div>
+  );
+}
+
+
+
+========================================
+ARQUIVO: src/pages/admin/AdminDashboard.tsx
+========================================
+
+// src/pages/admin/AdminDashboard.tsx
+
+import { useEffect, useState } from 'react';
+import { AdminLayout } from '@/components/admin/AdminLayout';
+import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { Users, BookOpen, PlayCircle, TrendingUp } from 'lucide-react';
+
+interface Stats {
+  totalAlunos: number;
+  alunosAtivos: number;
+  totalCursos: number;
+  totalAulas: number;
+  aulasCompletas: number;
+  acessosHoje: number;
+}
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<Stats>({
+    totalAlunos: 0,
+    alunosAtivos: 0,
+    totalCursos: 0,
+    totalAulas: 0,
+    aulasCompletas: 0,
+    acessosHoje: 0,
+  });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      // Total de alunos
+      const { count: totalAlunos } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'user');
+
+      // Alunos com acesso
+      const { count: alunosAtivos } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('has_full_access', true);
+
+      // Total de cursos
+      const { count: totalCursos } = await supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      // Total de aulas
+      const { count: totalAulas } = await supabase
+        .from('course_lessons')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      // Aulas completadas (total)
+      const { count: aulasCompletas } = await supabase
+        .from('user_lesson_progress')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_completed', true);
+
+      // Acessos hoje
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { count: acessosHoje } = await supabase
+        .from('access_logs')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString());
+
+      setStats({
+        totalAlunos: totalAlunos || 0,
+        alunosAtivos: alunosAtivos || 0,
+        totalCursos: totalCursos || 0,
+        totalAulas: totalAulas || 0,
+        aulasCompletas: aulasCompletas || 0,
+        acessosHoje: acessosHoje || 0,
+      });
+
+      // Atividade recente
+      const { data: activity } = await supabase
+        .from('access_logs')
+        .select(`
+          *,
+          profiles:user_id (full_name, email)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setRecentActivity(activity || []);
+      setLoading(false);
+    };
+
+    fetchStats();
+  }, []);
+
+  const statCards = [
+    { label: 'Total de Alunos', value: stats.totalAlunos, icon: Users, color: 'text-blue-600' },
+    { label: 'Alunos Ativos', value: stats.alunosAtivos, icon: TrendingUp, color: 'text-green-600' },
+    { label: 'Cursos', value: stats.totalCursos, icon: BookOpen, color: 'text-purple-600' },
+    { label: 'Aulas', value: stats.totalAulas, icon: PlayCircle, color: 'text-orange-600' },
+  ];
+
+  return (
+    <AdminLayout title="Dashboard">
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        {statCards.map((stat) => (
+          <Card key={stat.label} className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-md bg-accent p-2 ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <p className="text-2xl font-semibold text-foreground">
+                  {loading ? 'â€”' : stat.value}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Additional Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Aulas Completadas</p>
+          <p className="text-3xl font-semibold text-foreground">{stats.aulasCompletas}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Acessos Hoje</p>
+          <p className="text-3xl font-semibold text-foreground">{stats.acessosHoje}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground mb-1">Taxa de ConversÃ£o</p>
+          <p className="text-3xl font-semibold text-foreground">
+            {stats.totalAlunos > 0 
+              ? Math.round((stats.alunosAtivos / stats.totalAlunos) * 100) 
+              : 0}%
+          </p>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card className="p-4">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Atividade Recente</h2>
+        
+        {loading ? (
+          <p className="text-muted-foreground">Carregando...</p>
+        ) : recentActivity.length === 0 ? (
+          <p className="text-muted-foreground">Nenhuma atividade registrada.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentActivity.map((log) => (
+              <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {log.profiles?.full_name || log.profiles?.email || 'UsuÃ¡rio'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{log.action}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(log.created_at).toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </AdminLayout>
+  );
+}
+
+
+
+========================================
+ARQUIVO: src/pages/admin/AdminCursos.tsx
+========================================
+
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AdminLayout } from '@/components/admin/AdminLayout';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/integrations/supabase/client';
+import { Plus, Pencil, Trash2, BookOpen } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
+
+interface Course {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  thumbnail: string | null;
+  price: number | null;
+  is_active: boolean;
+  order_index: number;
+}
+
+const emptyCourse = {
+  name: '',
+  slug: '',
+  description: '',
+  thumbnail: '',
+  price: 0,
+  is_active: true,
+};
+
+export default function AdminCursos() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [formData, setFormData] = useState(emptyCourse);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const fetchCourses = async () => {
+    const { data } = await supabase
+      .from('courses')
+      .select('*')
+      .order('order_index');
+
+    setCourses(data || []);
+    setLoading(false);
+  };
+
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  };
+
+  const openCreateDialog = () => {
+    setSelectedCourse(null);
+    setFormData(emptyCourse);
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setFormData({
+      name: course.name,
+      slug: course.slug,
+      description: course.description || '',
+      thumbnail: course.thumbnail || '',
+      price: course.price || 0,
+      is_active: course.is_active,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openDeleteDialog = (course: Course) => {
+    setSelectedCourse(course);
+    setIsDeleteOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Nome Ã© obrigatÃ³rio');
+      return;
+    }
+
+    setSaving(true);
+    const slug = formData.slug || generateSlug(formData.name);
+
+    const data = {
+      name: formData.name,
+      slug,
+      description: formData.description || null,
+      thumbnail: formData.thumbnail || null,
+      price: formData.price || null,
+      is_active: formData.is_active,
+    };
+
+    if (selectedCourse) {
+      const { error } = await supabase
+        .from('courses')
+        .update(data)
+        .eq('id', selectedCourse.id);
+
+      if (error) {
+        toast.error('Erro ao atualizar curso');
+      } else {
+        toast.success('Curso atualizado');
+        setIsDialogOpen(false);
+        fetchCourses();
+      }
+    } else {
+      const { error } = await supabase.from('courses').insert({
+        ...data,
+        order_index: courses.length,
+      });
+
+      if (error) {
+        toast.error('Erro ao criar curso');
+      } else {
+        toast.success('Curso criado');
+        setIsDialogOpen(false);
+        fetchCourses();
+      }
+    }
+
+    setSaving(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedCourse) return;
+
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', selectedCourse.id);
+
+    if (error) {
+      toast.error('Erro ao excluir curso');
+    } else {
+      toast.success('Curso excluÃ­do');
+      setIsDeleteOpen(false);
+      fetchCourses();
+    }
+  };
+
+  const toggleActive = async (course: Course) => {
+    await supabase
+      .from('courses')
+      .update({ is_active: !course.is_active })
+      .eq('id', course.id);
+
+    fetchCourses();
+  };
+
+  return (
+    <AdminLayout title="Cursos" breadcrumb={[{ label: 'Cursos' }]}>
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-muted-foreground">
+          {courses.length} {courses.length === 1 ? 'curso' : 'cursos'}
+        </p>
+        <Button onClick={openCreateDialog}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Curso
+        </Button>
+      </div>
+
+      {loading ? (
+        <p className="text-muted-foreground">Carregando...</p>
+      ) : courses.length === 0 ? (
+        <Card className="p-8 text-center">
+          <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">Nenhum curso</h3>
+          <p className="text-muted-foreground mb-4">Crie seu primeiro curso.</p>
+          <Button onClick={openCreateDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Criar Curso
+          </Button>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {courses.map((course) => (
+            <Card key={course.id} className="p-4">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-24 rounded-md bg-muted overflow-hidden flex-shrink-0">
+                  {course.thumbnail ? (
+                    <img src={course.thumbnail} alt={course.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <BookOpen className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-medium text-foreground truncate">{course.name}</h3>
+                    {!course.is_active && (
+                      <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">Inativo</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {course.price ? `${course.price} MZN` : 'Sem preÃ§o'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Switch checked={course.is_active} onCheckedChange={() => toggleActive(course)} />
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to={`/admin/cursos/${course.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(course)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedCourse ? 'Editar Curso' : 'Novo Curso'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome do Curso *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value, slug: generateSlug(e.target.value) })}
+                placeholder="Ex: O CÃ³digo da Reconquista"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="slug">Slug (URL)</Label>
+              <Input
+                id="slug"
+                value={formData.slug}
+                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                placeholder="codigo-da-reconquista"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">DescriÃ§Ã£o</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="DescriÃ§Ã£o do curso..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="thumbnail">URL da Thumbnail</Label>
+              <Input
+                id="thumbnail"
+                value={formData.thumbnail}
+                onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price">PreÃ§o (MZN)</Label>
+              <Input
+                id="price"
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                placeholder="197"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is_active">Curso Ativo</Label>
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando...' : selectedCourse ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir curso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta aÃ§Ã£o nÃ£o pode ser desfeita. Todos os mÃ³dulos e aulas tambÃ©m serÃ£o excluÃ­dos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AdminLayout>
+  );
+}
+
+
+========================================
+ARQUIVO: src/pages/admin/AdminAlunos.tsx
+========================================
+
+// src/pages/admin/AdminAlunos.tsx
+
+import { useEffect, useState } from 'react';
+import { AdminLayout } from '@/components/admin/AdminLayout';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { Search, CheckCircle, XCircle, Eye } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+interface Aluno {
+  id: string;
+  email: string;
+  full_name: string | null;
+  whatsapp: string | null;
+  has_full_access: boolean;
+  created_at: string;
+  purchase_date: string | null;
+}
+
+interface AlunoProgress {
+  lessonTitle: string;
+  completed: boolean;
+  watchPercentage: number;
+}
+
+export default function AdminAlunos() {
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [filteredAlunos, setFilteredAlunos] = useState<Aluno[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
+  const [alunoProgress, setAlunoProgress] = useState<AlunoProgress[]>([]);
+  const [progressLoading, setProgressLoading] = useState(false);
+
+  useEffect(() => {
+    fetchAlunos();
+  }, []);
+
+  useEffect(() => {
+    if (search) {
+      const filtered = alunos.filter(
+        (a) =>
+          a.email.toLowerCase().includes(search.toLowerCase()) ||
+          a.full_name?.toLowerCase().includes(search.toLowerCase())
+      );
+      setFilteredAlunos(filtered);
+    } else {
+      setFilteredAlunos(alunos);
+    }
+  }, [search, alunos]);
+
+  const fetchAlunos = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'user')
+      .order('created_at', { ascending: false });
+
+    setAlunos(data || []);
+    setFilteredAlunos(data || []);
+    setLoading(false);
+  };
+
+  const viewProgress = async (aluno: Aluno) => {
+    setSelectedAluno(aluno);
+    setProgressLoading(true);
+
+    const { data } = await supabase
+      .from('user_lesson_progress')
+      .select(`
+        *,
+        course_lessons:lesson_id (title)
+      `)
+      .eq('user_id', aluno.id);
+
+    const progress: AlunoProgress[] = (data || []).map((p: any) => ({
+      lessonTitle: p.course_lessons?.title || 'Aula',
+      completed: p.is_completed,
+      watchPercentage: p.watch_percentage || 0,
+    }));
+
+    setAlunoProgress(progress);
+    setProgressLoading(false);
+  };
+
+  const toggleAccess = async (aluno: Aluno) => {
+    await supabase
+      .from('profiles')
+      .update({ has_full_access: !aluno.has_full_access })
+      .eq('id', aluno.id);
+
+    fetchAlunos();
+  };
+
+  return (
+    <AdminLayout title="Alunos" breadcrumb={[{ label: 'Alunos' }]}>
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Total de Alunos</p>
+          <p className="text-2xl font-semibold">{alunos.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Com Acesso</p>
+          <p className="text-2xl font-semibold text-green-600">
+            {alunos.filter((a) => a.has_full_access).length}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Sem Acesso</p>
+          <p className="text-2xl font-semibold text-red-600">
+            {alunos.filter((a) => !a.has_full_access).length}
+          </p>
+        </Card>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Nome</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">WhatsApp</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Acesso</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Cadastro</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">AÃ§Ãµes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Carregando...
+                  </td>
+                </tr>
+              ) : filteredAlunos.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Nenhum aluno encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filteredAlunos.map((aluno) => (
+                  <tr key={aluno.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-foreground">
+                      {aluno.full_name || 'â€”'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{aluno.email}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {aluno.whatsapp || 'â€”'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {aluno.has_full_access ? (
+                        <span className="inline-flex items-center gap-1 text-sm text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          Ativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-sm text-red-600">
+                          <XCircle className="h-4 w-4" />
+                          Inativo
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {new Date(aluno.created_at).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => viewProgress(aluno)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={aluno.has_full_access ? 'outline' : 'default'}
+                          size="sm"
+                          onClick={() => toggleAccess(aluno)}
+                        >
+                          {aluno.has_full_access ? 'Revogar' : 'Liberar'}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Progress Modal */}
+      <Dialog open={!!selectedAluno} onOpenChange={() => setSelectedAluno(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Progresso de {selectedAluno?.full_name || selectedAluno?.email}</DialogTitle>
+          </DialogHeader>
+
+          {progressLoading ? (
+            <p className="text-muted-foreground">Carregando...</p>
+          ) : alunoProgress.length === 0 ? (
+            <p className="text-muted-foreground">Nenhum progresso registrado.</p>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {alunoProgress.map((p, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    {p.completed ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
+                    )}
+                    <span className="text-sm">{p.lessonTitle}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{p.watchPercentage}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
+  );
+}
+
+
+
+========================================
+ARQUIVO: src/pages/Aula.tsx
+========================================
+
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { VideoPlayer } from '@/components/VideoPlayer';
+import { Button } from '@/components/ui/button';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  Menu,
+  X
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+interface Lesson {
+  id: string;
+  title: string;
+  description: string | null;
+  video_url: string | null;
+  duration_minutes: number | null;
+  is_bonus: boolean;
+  module_id: string;
+}
+
+interface Module {
+  id: string;
+  name: string;
+  course_id: string;
+}
+
+interface SidebarLesson {
+  id: string;
+  title: string;
+  is_completed: boolean;
+  order_index: number;
+}
+
+interface SidebarModule {
+  id: string;
+  name: string;
+  order_index: number;
+  lessons: SidebarLesson[];
+}
+
+export default function Aula() {
+  const { lessonId } = useParams();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [module, setModule] = useState<Module | null>(null);
+  const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [watchProgress, setWatchProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [prevLesson, setPrevLesson] = useState<string | null>(null);
+  const [nextLesson, setNextLesson] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user && lessonId) {
+      fetchLesson();
+    }
+  }, [user, lessonId]);
+
+  const fetchLesson = async () => {
+    if (!user || !lessonId) return;
+
+    const { data: lessonData } = await supabase
+      .from('course_lessons')
+      .select('*')
+      .eq('id', lessonId)
+      .single();
+
+    if (!lessonData) {
+      navigate('/dashboard');
+      return;
+    }
+
+    setLesson(lessonData);
+
+    const { data: moduleData } = await supabase
+      .from('course_modules')
+      .select('id, name, course_id')
+      .eq('id', lessonData.module_id)
+      .single();
+
+    setModule(moduleData);
+
+    const { data: progressData } = await supabase
+      .from('user_lesson_progress')
+      .select('is_completed, watch_percentage')
+      .eq('user_id', user.id)
+      .eq('lesson_id', lessonId)
+      .single();
+
+    if (progressData) {
+      setIsCompleted(progressData.is_completed);
+      setWatchProgress(progressData.watch_percentage || 0);
+    }
+
+    if (moduleData) {
+      const { data: allModules } = await supabase
+        .from('course_modules')
+        .select('id, name, order_index')
+        .eq('course_id', moduleData.course_id)
+        .eq('is_active', true)
+        .order('order_index');
+
+      if (allModules) {
+        const modulesWithLessons = await Promise.all(
+          allModules.map(async (mod) => {
+            const { data: lessonsData } = await supabase
+              .from('course_lessons')
+              .select('id, title, order_index')
+              .eq('module_id', mod.id)
+              .eq('is_active', true)
+              .order('order_index');
+
+            const lessonIds = lessonsData?.map(l => l.id) || [];
+            const { data: progressList } = await supabase
+              .from('user_lesson_progress')
+              .select('lesson_id, is_completed')
+              .eq('user_id', user.id)
+              .in('lesson_id', lessonIds);
+
+            const progressMap = new Map(
+              (progressList || []).map(p => [p.lesson_id, p.is_completed])
+            );
+
+            return {
+              ...mod,
+              lessons: (lessonsData || []).map(l => ({
+                ...l,
+                is_completed: progressMap.get(l.id) || false,
+              })),
+            };
+          })
+        );
+
+        setSidebarModules(modulesWithLessons);
+
+        const allLessons = modulesWithLessons.flatMap(m => m.lessons);
+        const currentIndex = allLessons.findIndex(l => l.id === lessonId);
+
+        setPrevLesson(currentIndex > 0 ? allLessons[currentIndex - 1].id : null);
+        setNextLesson(currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1].id : null);
+      }
+    }
+
+    await supabase.from('access_logs').insert({
+      user_id: user.id,
+      action: 'lesson_view',
+      metadata: { lesson_id: lessonId },
+    });
+
+    setLoading(false);
+  };
+
+  const handleProgress = async (percentage: number) => {
+    setWatchProgress(percentage);
+
+    if (!user || !lessonId) return;
+
+    await supabase.from('user_lesson_progress').upsert({
+      user_id: user.id,
+      lesson_id: lessonId,
+      watch_percentage: percentage,
+      last_watched_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,lesson_id'
+    });
+  };
+
+  const handleComplete = async () => {
+    if (!user || !lessonId) return;
+
+    await supabase.from('user_lesson_progress').upsert({
+      user_id: user.id,
+      lesson_id: lessonId,
+      is_completed: true,
+      completed_at: new Date().toISOString(),
+      watch_percentage: 100,
+      last_watched_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,lesson_id'
+    });
+
+    setIsCompleted(true);
+    toast.success(' Aula concluída!');
+
+    setSidebarModules(prev =>
+      prev.map(mod => ({
+        ...mod,
+        lessons: mod.lessons.map(l =>
+          l.id === lessonId ? { ...l, is_completed: true } : l
+        ),
+      }))
+    );
+
+    if (nextLesson) {
+      setTimeout(() => {
+        navigate(`/aula/${nextLesson}`);
+      }, 2000);
+    }
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950">
+      {/* ========== HEADER ========== */}
+      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
+        <div className="px-4">
+          <div className="flex h-14 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+                onClick={() => navigate('/dashboard')}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="hidden sm:block">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider">{module?.name}</p>
+                <h1 className="text-sm font-medium text-zinc-100 truncate max-w-md">
+                  {lesson?.title}
+                </h1>
+              </div>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 lg:hidden"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* ========== MAIN CONTENT ========== */}
+        <main className="flex-1 p-4 lg:p-8">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Video Player */}
+            {lesson?.video_url ? (
+              <div className="rounded-lg overflow-hidden border border-zinc-800/50">
+                <VideoPlayer
+                  youtubeId={lesson.video_url}
+                  onProgress={handleProgress}
+                  onComplete={handleComplete}
+                />
+              </div>
+            ) : (
+              <div className="aspect-video bg-zinc-900 rounded-lg overflow-hidden flex items-center justify-center border border-zinc-800/50">
+                <p className="text-zinc-500">Vídeo não disponível</p>
+              </div>
+            )}
+
+            {/* Lesson Info */}
+            <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h1 className="text-xl font-semibold text-zinc-100 mb-2">
+                    {lesson?.title}
+                  </h1>
+                  {lesson?.is_bonus && (
+                    <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium">
+                      AULA BÔNUS
+                    </span>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handleComplete}
+                  disabled={isCompleted}
+                  className={isCompleted 
+                    ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700" 
+                    : "bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
+                  }
+                >
+                  {isCompleted ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Concluída
+                    </>
+                  ) : (
+                    'Marcar como concluída'
+                  )}
+                </Button>
+              </div>
+
+              {lesson?.description && (
+                <p className="text-zinc-400 mb-4">{lesson.description}</p>
+              )}
+
+              {/* Progress Bar */}
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-zinc-500">Progresso da aula</span>
+                  <span className="text-zinc-400 font-medium tabular-nums">{watchProgress}%</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                  <div 
+                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                    style={{ width: `${watchProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between">
+              {prevLesson ? (
+                <Button
+                  variant="outline"
+                  className="border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+                  onClick={() => navigate(`/aula/${prevLesson}`)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Anterior
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              {nextLesson && (
+                <Button 
+                  className="bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
+                  onClick={() => navigate(`/aula/${nextLesson}`)}
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </main>
+
+        {/* ========== SIDEBAR ========== */}
+        <aside className={`
+          fixed lg:static inset-y-0 right-0 z-40
+          w-80 bg-zinc-900/50 border-l border-zinc-800/50
+          transform transition-transform lg:transform-none
+          ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+        `}>
+          <div className="h-full overflow-y-auto p-4">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-4">
+              Conteúdo do curso
+            </h2>
+
+            <div className="space-y-6">
+              {sidebarModules.map((mod, modIndex) => (
+                <div key={mod.id}>
+                  <p className="text-xs text-zinc-500 mb-2">
+                    MÓDULO {modIndex + 1}  {mod.name}
+                  </p>
+
+                  <div className="space-y-1">
+                    {mod.lessons.map((sideLesson, lessonIndex) => (
+                      <button
+                        key={sideLesson.id}
+                        onClick={() => {
+                          navigate(`/aula/${sideLesson.id}`);
+                          setSidebarOpen(false);
+                        }}
+                        className={`
+                          w-full flex items-center gap-3 px-3 py-2.5 rounded text-left text-sm transition-colors
+                          ${sideLesson.id === lessonId
+                            ? 'bg-zinc-800 text-zinc-100'
+                            : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100'
+                          }
+                        `}
+                      >
+                        {sideLesson.is_completed ? (
+                          <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-zinc-600 flex-shrink-0" />
+                        )}
+                        <span className="truncate">
+                          {modIndex + 1}.{lessonIndex + 1} {sideLesson.title}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+
+========================================
+ARQUIVO: src/components/VideoPlayer.tsx
+========================================
+
+import { useState, useMemo } from 'react';
+import Plyr from 'plyr-react';
+import 'plyr-react/plyr.css';
+import { toast } from 'sonner';
+
+interface VideoPlayerProps {
+  youtubeId: string;
+  onProgress?: (percentage: number) => void;
+  onComplete?: () => void;
+}
+
+export function VideoPlayer({ youtubeId, onProgress, onComplete }: VideoPlayerProps) {
+  const [hasCompleted, setHasCompleted] = useState(false);
+
+  const plyrSource = useMemo(() => ({
+    type: 'video' as const,
+    sources: [{ src: youtubeId, provider: 'youtube' as const }],
+  }), [youtubeId]);
+
+  const plyrOptions = useMemo(() => ({
+    controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+    settings: ['quality', 'speed'],
+    youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1, controls: 0, disablekb: 1, playsinline: 1 },
+    loop: { active: false },
+    ratio: '16:9' as const,
+  }), []);
+
+  const handleTimeUpdate = (event: any) => {
+    const player = event.detail.plyr;
+    if (player.duration > 0) {
+      const percentage = (player.currentTime / player.duration) * 100;
+      if (Math.floor(percentage) % 5 === 0) onProgress?.(Math.round(percentage));
+      if (percentage >= 90 && !hasCompleted) {
+        setHasCompleted(true);
+        toast.success('Aula concluída!');
+        onComplete?.();
+      }
+    }
+  };
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+      <Plyr source={plyrSource} options={plyrOptions} onTimeUpdate={handleTimeUpdate} />
+      <style>{`:root{--plyr-color-main:hsl(var(--primary))}.plyr__video-embed iframe{pointer-events:none}.plyr__controls{pointer-events:all!important;z-index:50;background:linear-gradient(to top,rgba(0,0,0,0.8),transparent)}.plyr__control--overlaid{pointer-events:all!important;z-index:50}`}</style>
+    </div>
+  );
+}
+
+
+
+========================================
+ARQUIVO: .env
+========================================
+
+# Supabase Configuration
+VITE_SUPABASE_URL=https://csltrjuucicnlhipaszh.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzbHRyanV1Y2ljbmxoaXBhc3poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NDQxODcsImV4cCI6MjA3NjAyMDE4N30.MSqM7ePuOtDkr_11X0MtFiqIXSrzXOeWd_5cPIH7VAE
+
+
+========================================
+ARQUIVO: package.json
+========================================
+
+{
+  "name": "codigo-da-reconquista",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ãrea de membros premium - CÃ³digo da Reconquista",
+  "author": "CÃ³digo da Reconquista",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "clean": "rm -rf dist node_modules/.vite",
+    "analyze": "vite build --mode production && npx vite-bundle-visualizer",
+    "analyze:stats": "vite build --mode production && du -sh dist && find dist -type f -name '*.js' -exec du -h {} + | sort -rh | head -10"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@hookform/resolvers": "^3.10.0",
+    "@radix-ui/react-accordion": "^1.2.11",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.1.7",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-collapsible": "^1.1.11",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-hover-card": "^1.1.14",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.15",
+    "@radix-ui/react-navigation-menu": "^1.2.13",
+    "@radix-ui/react-popover": "^1.1.14",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-radio-group": "^1.3.7",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slider": "^1.3.5",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.5",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@radix-ui/react-toast": "^1.2.14",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@radix-ui/react-tooltip": "^1.2.7",
+    "@supabase/supabase-js": "^2.81.1",
+    "@tanstack/react-query": "^5.83.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "input-otp": "^1.4.2",
+    "lucide-react": "^0.462.0",
+    "next-themes": "^0.3.0",
+    "plyr": "^3.8.3",
+    "plyr-react": "^5.3.0",
+    "react": "^18.3.1",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.61.1",
+    "react-resizable-panels": "^2.1.9",
+    "react-router-dom": "^6.30.1",
+    "recharts": "^2.15.4",
+    "sonner": "^1.7.4",
+    "tailwind-merge": "^2.6.0",
+    "vaul": "^0.9.9",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^22.16.5",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.32.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^15.15.0",
+    "lovable-tagger": "^1.1.11",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "rollup-plugin-visualizer": "^5.14.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vite": "^5.4.19",
+    "vite-bundle-visualizer": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
+
+
+
+========================================
+ARQUIVO: vite.config.ts
+========================================
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+import path from 'path'
+import { componentTagger } from "lovable-tagger"
+
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",
+    port: 8080,
+  },
+  plugins: [
+    react(),
+    mode === 'development' && componentTagger(),
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  base: '/',
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+        }
+      }
+    }
+  }
+}))
+
+
+
+
+========================================
+ARQUIVO: tsconfig.json
+========================================
+
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "checkJs": false
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "build", ".vercel"]
+}
+
+
+
+========================================
+ARQUIVO: src/App.tsx
+========================================
+
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+
+// Páginas públicas
+import Login from './pages/Login';
+import AutoLogin from './pages/AutoLogin';
+import NotFound from './pages/NotFound';
+
+// Páginas do aluno
+import Dashboard from './pages/Dashboard';
+import Cursos from './pages/Cursos';
+import CursoDetalhe from './pages/CursoDetalhe';
+import Aula from './pages/Aula';
+
+// Páginas admin
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminCursos from './pages/admin/AdminCursos';
+import AdminCursoDetalhe from './pages/admin/AdminCursoDetalhe';
+import AdminAlunos from './pages/admin/AdminAlunos';
+import AdminConfiguracoes from './pages/admin/AdminConfiguracoes';
+
+// Outras páginas
+import TestPlyr from './pages/TestPlyr';
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Rotas Públicas */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/auto-login" element={<AutoLogin />} />
+              <Route path="/test-plyr" element={<TestPlyr />} />
+
+              {/* Rotas do Aluno */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/cursos" element={<Cursos />} />
+              <Route path="/curso/:courseSlug" element={<CursoDetalhe />} />
+              <Route path="/aula/:lessonId" element={<Aula />} />
+              
+              {/* ===== ROTAS ADICIONADAS ===== */}
+              <Route path="/materiais" element={<Dashboard />} />
+              <Route path="/meu-plano" element={<Dashboard />} />
+              <Route path="/comunidade" element={<Dashboard />} />
+              <Route path="/perfil" element={<Dashboard />} />
+
+              {/* Rotas Admin */}
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/cursos" element={<AdminCursos />} />
+              <Route path="/admin/cursos/:courseId" element={<AdminCursoDetalhe />} />
+              <Route path="/admin/alunos" element={<AdminAlunos />} />
+              <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
+
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
+
+export default App;
+
+
+
+
+================================================================================
+FIM DA EXTRAÇÃO - Total de arquivos processados
+================================================================================

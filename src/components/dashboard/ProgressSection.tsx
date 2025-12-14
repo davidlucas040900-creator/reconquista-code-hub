@@ -1,29 +1,31 @@
-﻿// src/components/dashboard/ProgressSection.tsx
-
-import { useNavigate } from 'react-router-dom';
+﻿import { useNavigate } from 'react-router-dom';
 import { Play, ChevronRight } from 'lucide-react';
-import { User, Course } from '@/types';
-import { getCourseProgress, getWelcomeMessage } from '@/data/mockData';
+import { useUserCourseProgress } from '@/hooks/useUserProgress';
+import { CourseWithModules } from '@/hooks/useCourses';
+import { LessonProgress } from '@/hooks/useUserProgress';
 
 interface ProgressSectionProps {
-  user: User;
-  courses: Course[];
+  user: any;
+  courses: CourseWithModules[];
+  userProgress: LessonProgress[];
 }
 
-export function ProgressSection({ user, courses }: ProgressSectionProps) {
+export function ProgressSection({ user, courses, userProgress }: ProgressSectionProps) {
   const navigate = useNavigate();
-  const purchasedCourses = courses.filter(c => c.isPurchased);
-  const primaryCourse = purchasedCourses[0];
+
+  // Buscar último progresso
+  const lastProgress = userProgress
+    ?.sort((a, b) => new Date(b.last_watched_at).getTime() - new Date(a.last_watched_at).getTime())[0];
 
   const handleContinue = () => {
-    if (user.lastLesson) {
-      navigate(`/aula/${user.lastLesson.lessonId}`);
-    } else if (primaryCourse) {
-      navigate(`/curso/${primaryCourse.slug}`);
+    if (lastProgress) {
+      navigate(`/aula/${lastProgress.lesson_id}`);
+    } else if (courses.length > 0) {
+      navigate(`/curso/${courses[0].slug}`);
     }
   };
 
-  if (purchasedCourses.length === 0) return null;
+  if (!user || courses.length === 0) return null;
 
   return (
     <section className="py-8">
@@ -33,20 +35,20 @@ export function ProgressSection({ user, courses }: ProgressSectionProps) {
             {/* Welcome Message */}
             <div className="flex-1">
               <p className="text-gold text-sm font-medium tracking-wider uppercase mb-2">
-                 Olá, {user.name}
+                 Olá, {user.email?.split('@')[0]}
               </p>
               <p className="text-body text-lg mb-6">
-                {primaryCourse && getWelcomeMessage(primaryCourse.slug)}
+                Bem-vinda à tua jornada de transformação.
               </p>
 
               {/* Continue Button */}
-              {user.lastLesson && (
+              {lastProgress && (
                 <button
                   onClick={handleContinue}
                   className="btn-gold group"
                 >
                   <Play className="w-4 h-4" />
-                  <span>Continuar: {user.lastLesson.title}</span>
+                  <span>Continuar onde parou</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
               )}
@@ -54,8 +56,14 @@ export function ProgressSection({ user, courses }: ProgressSectionProps) {
 
             {/* Progress Bars */}
             <div className="lg:w-80 space-y-4">
-              {purchasedCourses.map((course) => {
-                const progress = getCourseProgress(course.slug);
+              {courses.slice(0, 3).map((course) => {
+                const totalLessons = course.modules?.reduce((sum, m) => sum + (m.lessons?.length || 0), 0) || 0;
+                const completedLessons = userProgress.filter(p => 
+                  p.is_completed && 
+                  course.modules?.some(m => m.lessons?.some(l => l.id === p.lesson_id))
+                ).length;
+                const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
                 return (
                   <div key={course.id}>
                     <div className="flex justify-between items-center mb-2">

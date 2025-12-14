@@ -1,43 +1,42 @@
 ﻿// src/components/dashboard/CourseSection.tsx
 
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ChevronRight } from 'lucide-react';
-import { Course } from '@/types';
+import { CourseWithModules } from '@/hooks/useCourses';
+import { LessonProgress } from '@/hooks/useUserProgress';
+import { useHasCourseAccess } from '@/hooks/useUserPurchases';
 
 interface CourseSectionProps {
-  course: Course;
-  activeTopicFilter: string;
+  course: CourseWithModules;
+  userProgress: LessonProgress[];
 }
 
-export function CourseSection({ course, activeTopicFilter }: CourseSectionProps) {
+export function CourseSection({ course, userProgress }: CourseSectionProps) {
   const navigate = useNavigate();
+  const hasAccess = useHasCourseAccess(course.slug);
 
-  // Filtrar MÓDULOS pelo tópico selecionado
-  const filteredModules = useMemo(() => {
-    if (activeTopicFilter === 'all') {
-      return course.modules;
-    }
-    // Filtra módulos que pertencem ao tópico do curso
-    // Se o curso tem o tópico selecionado, mostra todos os módulos
-    // Senão, não mostra nenhum módulo
-    if (course.topics.includes(activeTopicFilter)) {
-      return course.modules;
-    }
-    return [];
-  }, [course, activeTopicFilter]);
-
-  // Se não há módulos para mostrar, não renderiza a seção
-  if (filteredModules.length === 0) {
-    return null;
-  }
-
-  const handleModuleClick = (moduleId: string, isLocked: boolean) => {
-    if (isLocked) {
+  const handleModuleClick = (moduleId: string) => {
+    if (!hasAccess) {
+      // Navegar para página de vendas
       window.open(`/vendas/${course.slug}`, '_blank');
     } else {
       navigate(`/curso/${course.slug}?module=${moduleId}`);
     }
+  };
+
+  // Calcular progresso de cada módulo
+  const getModuleProgress = (moduleId: string) => {
+    const module = course.modules?.find(m => m.id === moduleId);
+    if (!module || !module.lessons) return 0;
+
+    const totalLessons = module.lessons.length;
+    if (totalLessons === 0) return 0;
+
+    const completedLessons = module.lessons.filter(lesson =>
+      userProgress.find(p => p.lesson_id === lesson.id && p.is_completed)
+    ).length;
+
+    return Math.round((completedLessons / totalLessons) * 100);
   };
 
   return (
@@ -47,10 +46,10 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="heading-section">{course.name}</h2>
-            <p className="text-body mt-1">{course.tagline}</p>
+            <p className="text-body mt-1">{course.description}</p>
           </div>
           
-          {course.isPurchased && (
+          {hasAccess && (
             <button
               onClick={() => navigate(`/curso/${course.slug}`)}
               className="btn-ghost hidden md:flex items-center gap-2"
@@ -63,35 +62,31 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
 
         {/* Modules Slider */}
         <div className="scroll-container">
-          {filteredModules.map((module) => {
-            const isLocked = !course.isPurchased || module.isLocked;
-            const progress = module.lessonsCount > 0
-              ? (module.completedLessons / module.lessonsCount) * 100
-              : 0;
+          {course.modules?.map((module) => {
+            const isLocked = !hasAccess;
+            const progress = getModuleProgress(module.id);
 
             return (
               <button
                 key={module.id}
-                onClick={() => handleModuleClick(module.id, isLocked)}
+                onClick={() => handleModuleClick(module.id)}
                 className="scroll-item w-40 md:w-48"
               >
                 <div className="card-module">
-                  {/* Image - SEM BLUR, apenas opacidade reduzida se bloqueado */}
+                  {/* Image */}
                   <img
-                    src={module.image}
-                    alt={module.title}
-                    className={`card-module-image ${isLocked ? 'opacity-60' : ''}`}
+                    src={module.thumbnail || 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=800&q=80'}
+                    alt={module.name}
+                    className={`card-module-image ${isLocked ? 'card-module-locked' : ''}`}
                   />
 
-                  {/* Overlay gradiente */}
+                  {/* Overlay */}
                   <div className="card-module-overlay" />
 
-                  {/* Cadeado pequeno no canto inferior direito */}
+                  {/* Lock Icon */}
                   {isLocked && (
-                    <div className="absolute bottom-3 right-3 z-10">
-                      <div className="w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center border border-gold/30">
-                        <Lock className="w-3.5 h-3.5 text-gold" />
-                      </div>
+                    <div className="lock-overlay">
+                      <Lock className="lock-icon" />
                     </div>
                   )}
 
@@ -99,11 +94,18 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                   {!isLocked && progress > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
                       <div
-                        className="h-full bg-gold"
+                        className="h-full bg-gold transition-all duration-500"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
                   )}
+
+                  {/* Module Title (hover) */}
+                  <div className="absolute inset-x-0 bottom-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <p className="text-white text-sm font-semibold line-clamp-2">
+                      {module.name}
+                    </p>
+                  </div>
                 </div>
               </button>
             );
