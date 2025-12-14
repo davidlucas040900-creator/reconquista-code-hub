@@ -23,6 +23,7 @@ export interface ModuleWithLessons {
   thumbnail: string;
   order_index: number;
   is_active: boolean;
+  topics?: string[];
   course_lessons?: Lesson[];
 }
 
@@ -77,6 +78,7 @@ export function useCourses() {
 
               return {
                 ...module,
+                topics: module.topics || [],
                 course_lessons: lessons || []
               };
             })

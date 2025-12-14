@@ -10,11 +10,12 @@ import { CourseSection } from '@/components/dashboard/CourseSection';
 import { useCourses } from '@/hooks/useCourses';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Tópicos para filtro (estático por enquanto)
+// Tópicos para filtro - SEXO ADICIONADO
 const topics = [
   { id: 'all', name: 'Todos', icon: '' },
   { id: 'reconquista', name: 'Reconquista', icon: '' },
   { id: 'seducao', name: 'Sedução', icon: '' },
+  { id: 'sexo', name: 'Sexo', icon: '' },
   { id: 'psicologia', name: 'Psicologia', icon: '' },
   { id: 'comunicacao', name: 'Comunicação', icon: '' },
   { id: 'confianca', name: 'Confiança', icon: '' },

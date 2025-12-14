@@ -1,25 +1,56 @@
-﻿import { useEffect, useState } from 'react';
+﻿// src/pages/CursoDetalhe.tsx
+
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserProgress } from '@/hooks/useUserProgress';
+import { useUserAccess } from '@/hooks/useUserAccess';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronDown, ChevronRight, PlayCircle, Circle, Loader2, Lock } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { 
+  ChevronLeft, 
+  ChevronDown, 
+  ChevronRight, 
+  PlayCircle, 
+  CheckCircle,
+  Circle,
+  Loader2, 
+  Lock,
+  Clock,
+  BookOpen
+} from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Module {
   id: string;
   name: string;
-  lessons: { id: string; title: string; is_bonus: boolean }[];
+  description: string;
+  thumbnail: string;
+  lessons: { id: string; title: string; is_bonus: boolean; duration_minutes: number }[];
+}
+
+interface Course {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  thumbnail: string;
 }
 
 export default function CursoDetalhe() {
   const { courseSlug } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [courseName, setCourseName] = useState('');
+  const { data: userProgress } = useUserProgress();
+  const { data: accessData } = useUserAccess();
+  
+  const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+
+  const hasAccess = accessData?.hasFullAccess || accessData?.purchasedCourses?.includes(courseSlug || '');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,23 +65,23 @@ export default function CursoDetalhe() {
   }, [user, courseSlug]);
 
   const fetchCourse = async () => {
-    const { data: course } = await supabase
+    const { data: courseData } = await supabase
       .from('courses')
-      .select('id, name')
+      .select('*')
       .eq('slug', courseSlug)
       .single();
 
-    if (!course) {
+    if (!courseData) {
       navigate('/cursos');
       return;
     }
 
-    setCourseName(course.name);
+    setCourse(courseData);
 
     const { data: modulesData } = await supabase
       .from('course_modules')
-      .select('id, name')
-      .eq('course_id', course.id)
+      .select('id, name, description, thumbnail')
+      .eq('course_id', courseData.id)
       .eq('is_active', true)
       .order('order_index');
 
@@ -59,7 +90,7 @@ export default function CursoDetalhe() {
         modulesData.map(async (mod) => {
           const { data: lessons } = await supabase
             .from('course_lessons')
-            .select('id, title, is_bonus')
+            .select('id, title, is_bonus, duration_minutes')
             .eq('module_id', mod.id)
             .eq('is_active', true)
             .order('order_index');
@@ -82,94 +113,240 @@ export default function CursoDetalhe() {
     setExpandedModules(newSet);
   };
 
+  const isLessonCompleted = (lessonId: string) => {
+    return userProgress?.some(p => p.lesson_id === lessonId && p.is_completed) || false;
+  };
+
+  const getModuleProgress = (module: Module) => {
+    if (!userProgress || !module.lessons.length) return 0;
+    const completed = module.lessons.filter(l => isLessonCompleted(l.id)).length;
+    return Math.round((completed / module.lessons.length) * 100);
+  };
+
+  const getTotalDuration = () => {
+    const totalMinutes = modules.reduce((acc, mod) => 
+      acc + mod.lessons.reduce((a, l) => a + (l.duration_minutes || 0), 0), 0
+    );
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  const getTotalLessons = () => {
+    return modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
+  };
+
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+      <div className="flex min-h-screen items-center justify-center bg-noir-950">
+        <Loader2 className="h-8 w-8 animate-spin text-gold" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      {/* ========== HEADER ========== */}
-      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
-        <div className="mx-auto max-w-3xl px-4">
-          <div className="flex h-14 items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+    <div className="min-h-screen bg-noir-950">
+      {/* Hero Section */}
+      <div className="relative h-[40vh] md:h-[50vh] overflow-hidden">
+        {/* Background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: course?.thumbnail 
+              ? `url(${course.thumbnail})`
+              : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-noir-950 via-noir-950/70 to-noir-950/30" />
+        </div>
+
+        {/* Header */}
+        <header className="absolute top-0 left-0 right-0 z-10">
+          <div className="px-4 md:px-8 py-4">
+            <button
               onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
             >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-base font-medium text-zinc-100 truncate">{courseName}</h1>
+              <ChevronLeft className="w-5 h-5" />
+              <span className="text-sm font-medium">Voltar</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Course Info */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8">
+          <div className="max-w-4xl">
+            <h1 className="text-2xl md:text-4xl lg:text-5xl font-playfair font-bold text-white mb-3">
+              {course?.name}
+            </h1>
+            <p className="text-gray-300 text-sm md:text-base mb-4 max-w-2xl">
+              {course?.description || 'Transforme sua vida com este curso exclusivo.'}
+            </p>
+            
+            {/* Stats */}
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center gap-2 text-gray-300">
+                <BookOpen className="w-4 h-4 text-gold" />
+                <span>{modules.length} módulos</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <PlayCircle className="w-4 h-4 text-gold" />
+                <span>{getTotalLessons()} aulas</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <Clock className="w-4 h-4 text-gold" />
+                <span>{getTotalDuration()}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* ========== MAIN ========== */}
-      <main className="mx-auto max-w-3xl px-4 py-8 space-y-3">
-        {modules.map((mod, modIndex) => (
-          <div key={mod.id} className="overflow-hidden rounded-lg border border-zinc-800/50 bg-zinc-900/30">
-            <Collapsible open={expandedModules.has(mod.id)} onOpenChange={() => toggleModule(mod.id)}>
-              <CollapsibleTrigger className="w-full p-5 text-left flex items-center gap-4 hover:bg-zinc-900/50">
-                {expandedModules.has(mod.id) ? (
-                  <ChevronDown className="h-4 w-4 text-zinc-500 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-zinc-500 flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs uppercase tracking-wider text-zinc-500">
-                    Módulo {modIndex + 1}
-                  </span>
-                  <h3 className="mt-0.5 font-medium text-zinc-100">{mod.name}</h3>
-                </div>
-                <span className="text-sm tabular-nums text-zinc-400 flex-shrink-0">
-                  {mod.lessons.length} aulas
-                </span>
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent>
-                <div className="border-t border-zinc-800/50">
-                  {mod.lessons.map((lesson, i) => (
-                    <button
-                      key={lesson.id}
-                      onClick={() => navigate(`/aula/${lesson.id}`)}
-                      className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-zinc-900/50 border-b border-zinc-800/30 last:border-0 group"
-                    >
-                      <Circle className="h-4 w-4 text-zinc-600 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs text-zinc-500 tabular-nums">
-                            {modIndex + 1}.{i + 1}
-                          </span>
-                          {lesson.is_bonus && (
-                            <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded font-medium">
-                              BÔNUS
-                            </span>
-                          )}
+      {/* Modules List */}
+      <main className="px-4 md:px-8 py-6 md:py-8 max-w-4xl mx-auto">
+        <div className="space-y-3">
+          {modules.map((mod, modIndex) => {
+            const progress = getModuleProgress(mod);
+            const isComplete = progress === 100;
+
+            return (
+              <div 
+                key={mod.id} 
+                className="overflow-hidden rounded-xl border border-white/10 bg-noir-900/50 backdrop-blur-sm"
+              >
+                <Collapsible open={expandedModules.has(mod.id)} onOpenChange={() => toggleModule(mod.id)}>
+                  <CollapsibleTrigger className="w-full p-4 md:p-5 text-left flex items-center gap-4 hover:bg-white/5 transition-colors">
+                    {/* Module Thumbnail */}
+                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+                      {mod.thumbnail ? (
+                        <img src={mod.thumbnail} alt={mod.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-900/40 to-zinc-800 flex items-center justify-center">
+                          <span className="text-xl font-bold text-purple-400/50">{modIndex + 1}</span>
                         </div>
-                        <p className="text-sm text-zinc-200 group-hover:text-zinc-100">
-                          {lesson.title}
-                        </p>
+                      )}
+                    </div>
+
+                    {/* Module Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {isComplete && (
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        )}
+                        <h3 className="font-semibold text-white text-sm md:text-base truncate">
+                          {mod.name}
+                        </h3>
                       </div>
-                      <PlayCircle className="h-4 w-4 text-zinc-600 flex-shrink-0 group-hover:text-zinc-400" />
-                    </button>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+                      <p className="text-gray-400 text-xs md:text-sm mb-2">
+                        {mod.lessons.length} aulas
+                      </p>
+                      {progress > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Progress value={progress} className="h-1.5 flex-1" />
+                          <span className="text-xs text-gold font-medium">{progress}%</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Expand Icon */}
+                    <div className="flex-shrink-0">
+                      {expandedModules.has(mod.id) ? (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <div className="border-t border-white/5 bg-black/20">
+                      {mod.lessons.map((lesson, i) => {
+                        const completed = isLessonCompleted(lesson.id);
+
+                        return (
+                          <button
+                            key={lesson.id}
+                            onClick={() => hasAccess ? navigate(`/aula/${lesson.id}`) : null}
+                            disabled={!hasAccess}
+                            className={`w-full flex items-center gap-4 px-4 md:px-5 py-3 md:py-4 text-left border-b border-white/5 last:border-0 transition-colors ${
+                              hasAccess ? 'hover:bg-white/5' : 'opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            {/* Status Icon */}
+                            <div className="flex-shrink-0">
+                              {!hasAccess ? (
+                                <Lock className="w-4 h-4 text-gray-500" />
+                              ) : completed ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-gray-500" />
+                              )}
+                            </div>
+
+                            {/* Lesson Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs text-gray-500">
+                                  {modIndex + 1}.{i + 1}
+                                </span>
+                                {lesson.is_bonus && (
+                                  <span className="text-[10px] bg-gold/20 text-gold px-1.5 py-0.5 rounded font-medium">
+                                    BÔNUS
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-sm ${completed ? 'text-gray-400' : 'text-white'}`}>
+                                {lesson.title}
+                              </p>
+                            </div>
+
+                            {/* Duration */}
+                            {lesson.duration_minutes && (
+                              <span className="text-xs text-gray-500 flex-shrink-0">
+                                {lesson.duration_minutes}min
+                              </span>
+                            )}
+
+                            {/* Play Icon */}
+                            {hasAccess && (
+                              <PlayCircle className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* CTA para não assinantes */}
+        {!hasAccess && (
+          <div className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-gold/20 to-purple-500/20 border border-gold/30 text-center">
+            <Lock className="w-10 h-10 text-gold mx-auto mb-3" />
+            <h3 className="text-xl font-bold text-white mb-2">
+              Desbloqueie este curso
+            </h3>
+            <p className="text-gray-300 mb-4 text-sm">
+              Adquira o acesso completo e comece sua transformação hoje.
+            </p>
+            <Button
+              onClick={() => window.open('https://pay.lojou.co/codigo-reconquista', '_blank')}
+              className="bg-gold hover:bg-gold-light text-noir-950 font-bold px-8 py-3 rounded-full"
+            >
+              QUERO ACESSO AGORA
+            </Button>
           </div>
-        ))}
+        )}
       </main>
 
-      {/* ========== FOOTER ========== */}
-      <footer className="mt-auto border-t border-zinc-800/50 bg-zinc-900/30">
-        <div className="mx-auto max-w-3xl px-4 py-6">
-          <p className="text-center text-xs text-zinc-600">
-            © 2024 Reconquista. Todos os direitos reservados.
+      {/* Footer */}
+      <footer className="border-t border-white/5 bg-noir-900/30">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <p className="text-center text-xs text-gray-500">
+             2024 Reconquista. Todos os direitos reservados.
           </p>
         </div>
       </footer>
