@@ -22,12 +22,12 @@ const courseDescriptions: Record<string, string> = {
 // Descrições resumidas dos módulos do Santuário (por slug)
 const santuarioModuleDescriptions: Record<string, string> = {
   'poder-onisciencia': 'Detecta mentiras e nunca mais seja enganada.',
-  'campo-batalha-digital': 'Aprenda a fazer posts estratégicos que ativam ciúmes e desejo.',
+  'campo-batalha-digital': 'Posts estratégicos que ativam ciúmes e desejo.',
   'acesso-cerebro': 'Respostas que desarmam qualquer ego masculino.',
   'blacklist-masculina': 'Neutraliza homens perigosos antes que magoem.',
   'protocolo-emergencia': 'Áudios de emergência para momentos críticos',
   'diario-deusa': 'Áudios contra momentos de fraqueza.',
-  'mentorias-lives': 'Descubra as estratégias exatas usadas para reverterem as situações mais difíceis.',
+  'mentorias-lives': 'Acelere seus resultados 10x mais rápido',
 };
 
 export function CourseSection({ course, activeTopicFilter }: CourseSectionProps) {
