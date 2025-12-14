@@ -249,3 +249,50 @@
     font-size: clamp(1.5rem, 4vw, 2.5rem);
   }
 }
+
+/* ============================================
+   FIX: INPUTS SEMPRE VISÍVEIS (TEXTO BRANCO)
+   ============================================ */
+
+/* Texto dos inputs sempre branco */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="number"],
+input[type="tel"],
+textarea,
+select {
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}
+
+/* Placeholder cinza claro */
+input::placeholder,
+textarea::placeholder {
+  color: rgb(156 163 175) !important; /* gray-400 */
+  opacity: 1 !important;
+}
+
+/* Remove background amarelo do autofill do Chrome */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1a1a1a inset !important;
+  -webkit-text-fill-color: white !important;
+  caret-color: white !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Cursor branco */
+input,
+textarea {
+  caret-color: white !important;
+}
+
+/* Focus state */
+input:focus,
+textarea:focus {
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}
