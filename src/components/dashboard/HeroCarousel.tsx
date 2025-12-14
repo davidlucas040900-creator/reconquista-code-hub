@@ -1,189 +1,139 @@
 ﻿// src/components/dashboard/HeroCarousel.tsx
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, ChevronRight, ChevronLeft } from 'lucide-react';
-import { Course, Module } from '@/types';
+import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import type { CourseWithModules } from '@/hooks/useCourses';
 
 interface HeroCarouselProps {
-  courses: Course[];
-  autoPlayInterval?: number;
+  courses: CourseWithModules[];
 }
 
-interface SlideData {
-  module: Module;
-  course: Course;
-}
-
-export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselProps) {
+export function HeroCarousel({ courses }: HeroCarouselProps) {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  
-  // Touch/Swipe states
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
 
-  // Criar array com TODOS os módulos de TODOS os cursos
-  const allSlides: SlideData[] = useMemo(() => {
-    const slides: SlideData[] = [];
-    
-    courses.forEach((course) => {
-      course.modules.forEach((module) => {
-        slides.push({
-          module,
-          course,
-        });
-      });
-    });
-    
-    return slides;
-  }, [courses]);
-
-  // Navegação
-  const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % allSlides.length);
-  }, [allSlides.length]);
-
-  const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + allSlides.length) % allSlides.length);
-  }, [allSlides.length]);
-
-  // Auto-play com loop infinito
+  // Auto-scroll
   useEffect(() => {
-    if (isPaused || allSlides.length <= 1) return;
+    if (courses.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % courses.length);
+    }, 5000);
 
-    const interval = setInterval(nextSlide, autoPlayInterval);
     return () => clearInterval(interval);
-  }, [isPaused, nextSlide, autoPlayInterval, allSlides.length]);
+  }, [courses.length]);
 
-  // Touch handlers para swipe
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    setIsPaused(true);
+  if (!courses.length) {
+    return (
+      <section className="relative h-[50vh] md:h-[60vh] bg-gradient-to-b from-purple-900/20 to-noir-950 flex items-center justify-center">
+        <p className="text-gray-400">Nenhum curso disponível</p>
+      </section>
+    );
+  }
+
+  const currentCourse = courses[currentIndex];
+  const totalLessons = currentCourse.course_modules?.reduce(
+    (acc, mod) => acc + (mod.course_lessons?.length || 0), 0
+  ) || 0;
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev - 1 + courses.length) % courses.length);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % courses.length);
   };
-
-  const handleTouchEnd = () => {
-    const diff = touchStartX.current - touchEndX.current;
-    const threshold = 50; // Mínimo de pixels para considerar swipe
-
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0) {
-        nextSlide(); // Swipe para esquerda = próximo
-      } else {
-        prevSlide(); // Swipe para direita = anterior
-      }
-    }
-    
-    setIsPaused(false);
-  };
-
-  const handleSlideClick = (slide: SlideData) => {
-    const isLocked = !slide.course.isPurchased || slide.module.isLocked;
-    
-    if (isLocked) {
-      window.open(`/vendas/${slide.course.slug}`, '_blank');
-    } else {
-      navigate(`/curso/${slide.course.slug}?module=${slide.module.id}`);
-    }
-  };
-
-  if (allSlides.length === 0) return null;
 
   return (
-    <section
-      className="carousel-hero h-[70vh] md:h-[80vh] relative"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Slides */}
-      <div
-        className="carousel-track h-full"
-        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+    <section className="relative h-[50vh] md:h-[60vh] overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center transition-all duration-700"
+        style={{
+          backgroundImage: currentCourse.thumbnail 
+            ? `url(${currentCourse.thumbnail})` 
+            : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        }}
       >
-        {allSlides.map((slide) => (
-          <div key={`${slide.course.id}-${slide.module.id}`} className="carousel-slide h-full">
-            {/* Background Image */}
-            <div className="absolute inset-0">
-              <img
-                src={slide.module.image}
-                alt={slide.module.title}
-                className="w-full h-full object-cover"
-              />
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-t from-noir-950 via-transparent to-transparent" />
-            </div>
-
-            {/* Content - Posicionado mais abaixo */}
-            <div className="relative z-10 h-full flex items-end pb-24 md:pb-32">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-                <div className="max-w-2xl">
-                  {/* Title */}
-                  <h2 className="heading-hero mb-4">
-                    {slide.module.title}
-                  </h2>
-
-                  {/* Description */}
-                  <p className="text-body text-lg mb-8 max-w-lg">
-                    {slide.module.description}
-                  </p>
-
-                  {/* CTA */}
-                  <button
-                    onClick={() => handleSlideClick(slide)}
-                    className="btn-gold text-lg group"
-                  >
-                    <Play className="w-5 h-5" />
-                    <span>COMEÇAR AGORA</span>
-                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-noir-950 via-noir-950/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-noir-950/80 to-transparent" />
       </div>
 
-      {/* Setas de navegação - Desktop */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 hidden md:flex
-                   w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm
-                   items-center justify-center text-white/70 hover:text-white
-                   hover:bg-black/50 transition-all"
-        aria-label="Anterior"
-      >
-        <ChevronLeft className="w-6 h-6" />
-      </button>
+      {/* Content */}
+      <div className="relative h-full flex items-end pb-12 px-4 md:px-8">
+        <div className="max-w-2xl">
+          {/* Badge */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-3 py-1 bg-purple-600/80 text-white text-xs font-semibold rounded-full">
+              DESTAQUE
+            </span>
+            <span className="text-gray-400 text-sm">
+              {currentCourse.course_modules?.length || 0} módulos  {totalLessons} aulas
+            </span>
+          </div>
 
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 hidden md:flex
-                   w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm
-                   items-center justify-center text-white/70 hover:text-white
-                   hover:bg-black/50 transition-all"
-        aria-label="Próximo"
-      >
-        <ChevronRight className="w-6 h-6" />
-      </button>
+          {/* Title */}
+          <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 leading-tight">
+            {currentCourse.name}
+          </h1>
 
-      {/* Indicators */}
-      {allSlides.length > 1 && (
-        <div className="carousel-indicators">
-          {allSlides.map((_, index) => (
+          {/* Description */}
+          <p className="text-gray-300 text-base md:text-lg mb-6 line-clamp-2">
+            {currentCourse.description || 'Transforme sua vida com este curso exclusivo'}
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={() => navigate(`/curso/${currentCourse.slug}`)}
+              className="bg-white text-black hover:bg-gray-200 font-semibold px-6 py-3"
+            >
+              <Play className="w-5 h-5 mr-2 fill-current" />
+              Assistir
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => navigate(`/curso/${currentCourse.slug}`)}
+              className="border-white/30 text-white hover:bg-white/10"
+            >
+              Mais Informações
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Arrows */}
+      {courses.length > 1 && (
+        <>
+          <button
+            onClick={goToPrevious}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-0 hover:opacity-100 group-hover:opacity-100 md:opacity-70"
+          >
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-all opacity-0 hover:opacity-100 group-hover:opacity-100 md:opacity-70"
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+        </>
+      )}
+
+      {/* Dots Indicator */}
+      {courses.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+          {courses.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
-              className={`carousel-dot ${index === currentIndex ? 'carousel-dot-active' : ''}`}
-              aria-label={`Ir para slide ${index + 1}`}
+              className={`w-2 h-2 rounded-full transition-all ${
+                index === currentIndex 
+                  ? 'w-8 bg-white' 
+                  : 'bg-white/40 hover:bg-white/60'
+              }`}
             />
           ))}
         </div>

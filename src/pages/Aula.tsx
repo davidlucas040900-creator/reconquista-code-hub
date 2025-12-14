@@ -1,422 +1,291 @@
-﻿import { useEffect, useState } from 'react';
+﻿// src/pages/Aula.tsx
+
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { VideoPlayer } from '@/components/VideoPlayer';
+import { LessonSidebar } from '@/components/LessonSidebar';
 import { Button } from '@/components/ui/button';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  Menu,
-  X
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Lesson {
-  id: string;
-  title: string;
-  description: string | null;
-  video_url: string | null;
-  duration_minutes: number | null;
-  is_bonus: boolean;
-  module_id: string;
-}
-
-interface Module {
-  id: string;
-  name: string;
-  course_id: string;
-}
-
-interface SidebarLesson {
-  id: string;
-  title: string;
-  is_completed: boolean;
-  order_index: number;
-}
-
-interface SidebarModule {
-  id: string;
-  name: string;
-  order_index: number;
-  lessons: SidebarLesson[];
-}
 
 export default function Aula() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [module, setModule] = useState<Module | null>(null);
-  const [sidebarModules, setSidebarModules] = useState<SidebarModule[]>([]);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const queryClient = useQueryClient();
   const [watchProgress, setWatchProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [prevLesson, setPrevLesson] = useState<string | null>(null);
-  const [nextLesson, setNextLesson] = useState<string | null>(null);
-
+  // Verificar autenticação
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login');
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user && lessonId) {
-      fetchLesson();
-    }
-  }, [user, lessonId]);
+  // Buscar dados da aula atual
+  const { data: lesson, isLoading: lessonLoading } = useQuery({
+    queryKey: ['lesson', lessonId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('course_lessons')
+        .select(`
+          *,
+          module:course_modules(
+            *,
+            course:courses(*)
+          )
+        `)
+        .eq('id', lessonId)
+        .single();
 
-  const fetchLesson = async () => {
-    if (!user || !lessonId) return;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!lessonId,
+  });
 
-    const { data: lessonData } = await supabase
-      .from('course_lessons')
-      .select('*')
-      .eq('id', lessonId)
-      .single();
-
-    if (!lessonData) {
-      navigate('/dashboard');
-      return;
-    }
-
-    setLesson(lessonData);
-
-    const { data: moduleData } = await supabase
-      .from('course_modules')
-      .select('id, name, course_id')
-      .eq('id', lessonData.module_id)
-      .single();
-
-    setModule(moduleData);
-
-    const { data: progressData } = await supabase
-      .from('user_lesson_progress')
-      .select('is_completed, watch_percentage')
-      .eq('user_id', user.id)
-      .eq('lesson_id', lessonId)
-      .single();
-
-    if (progressData) {
-      setIsCompleted(progressData.is_completed);
-      setWatchProgress(progressData.watch_percentage || 0);
-    }
-
-    if (moduleData) {
-      const { data: allModules } = await supabase
-        .from('course_modules')
-        .select('id, name, order_index')
-        .eq('course_id', moduleData.course_id)
-        .eq('is_active', true)
+  // Buscar todas as aulas do módulo para navegação
+  const { data: moduleLessons } = useQuery({
+    queryKey: ['module-lessons', lesson?.module?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('course_lessons')
+        .select('id, title, order_index')
+        .eq('module_id', lesson?.module?.id)
         .order('order_index');
 
-      if (allModules) {
-        const modulesWithLessons = await Promise.all(
-          allModules.map(async (mod) => {
-            const { data: lessonsData } = await supabase
-              .from('course_lessons')
-              .select('id, title, order_index')
-              .eq('module_id', mod.id)
-              .eq('is_active', true)
-              .order('order_index');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!lesson?.module?.id,
+  });
 
-            const lessonIds = lessonsData?.map(l => l.id) || [];
-            const { data: progressList } = await supabase
-              .from('user_lesson_progress')
-              .select('lesson_id, is_completed')
-              .eq('user_id', user.id)
-              .in('lesson_id', lessonIds);
+  // Buscar progresso do usuário para esta aula
+  const { data: userProgress } = useQuery({
+    queryKey: ['lesson-progress', user?.id, lessonId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_lesson_progress')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('lesson_id', lessonId)
+        .single();
 
-            const progressMap = new Map(
-              (progressList || []).map(p => [p.lesson_id, p.is_completed])
-            );
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: !!user?.id && !!lessonId,
+  });
 
-            return {
-              ...mod,
-              lessons: (lessonsData || []).map(l => ({
-                ...l,
-                is_completed: progressMap.get(l.id) || false,
-              })),
-            };
-          })
-        );
+  // Mutation para salvar progresso
+  const saveProgress = useMutation({
+    mutationFn: async ({ percentage, completed }: { percentage: number; completed?: boolean }) => {
+      const { error } = await supabase
+        .from('user_lesson_progress')
+        .upsert({
+          user_id: user!.id,
+          lesson_id: lessonId,
+          watch_percentage: percentage,
+          is_completed: completed || percentage >= 90,
+          completed_at: completed || percentage >= 90 ? new Date().toISOString() : null,
+          last_watched_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,lesson_id'
+        });
 
-        setSidebarModules(modulesWithLessons);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lesson-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['user-progress'] });
+    },
+  });
 
-        const allLessons = modulesWithLessons.flatMap(m => m.lessons);
-        const currentIndex = allLessons.findIndex(l => l.id === lessonId);
-
-        setPrevLesson(currentIndex > 0 ? allLessons[currentIndex - 1].id : null);
-        setNextLesson(currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1].id : null);
-      }
-    }
-
-    await supabase.from('access_logs').insert({
-      user_id: user.id,
-      action: 'lesson_view',
-      metadata: { lesson_id: lessonId },
+  // Marcar como completa
+  const markAsCompleted = async () => {
+    await saveProgress.mutateAsync({ percentage: 100, completed: true });
+    toast.success(' Aula concluída!', {
+      description: 'Parabéns por mais uma conquista!',
     });
-
-    setLoading(false);
   };
 
-  const handleProgress = async (percentage: number) => {
+  // Handler de progresso do vídeo
+  const handleProgress = (percentage: number) => {
     setWatchProgress(percentage);
-
-    if (!user || !lessonId) return;
-
-    await supabase.from('user_lesson_progress').upsert({
-      user_id: user.id,
-      lesson_id: lessonId,
-      watch_percentage: percentage,
-      last_watched_at: new Date().toISOString(),
-    }, {
-      onConflict: 'user_id,lesson_id'
-    });
-  };
-
-  const handleComplete = async () => {
-    if (!user || !lessonId) return;
-
-    await supabase.from('user_lesson_progress').upsert({
-      user_id: user.id,
-      lesson_id: lessonId,
-      is_completed: true,
-      completed_at: new Date().toISOString(),
-      watch_percentage: 100,
-      last_watched_at: new Date().toISOString(),
-    }, {
-      onConflict: 'user_id,lesson_id'
-    });
-
-    setIsCompleted(true);
-    toast.success(' Aula concluída!');
-
-    setSidebarModules(prev =>
-      prev.map(mod => ({
-        ...mod,
-        lessons: mod.lessons.map(l =>
-          l.id === lessonId ? { ...l, is_completed: true } : l
-        ),
-      }))
-    );
-
-    if (nextLesson) {
-      setTimeout(() => {
-        navigate(`/aula/${nextLesson}`);
-      }, 2000);
+    
+    // Salvar a cada 10% de progresso
+    if (percentage % 10 === 0 && percentage > 0) {
+      saveProgress.mutate({ percentage });
     }
   };
 
-  if (authLoading || loading) {
+  // Navegação entre aulas
+  const currentIndex = moduleLessons?.findIndex(l => l.id === lessonId) ?? -1;
+  const prevLesson = currentIndex > 0 ? moduleLessons?.[currentIndex - 1] : null;
+  const nextLesson = currentIndex < (moduleLessons?.length ?? 0) - 1 ? moduleLessons?.[currentIndex + 1] : null;
+
+  if (authLoading || lessonLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+      <div className="flex min-h-screen items-center justify-center bg-noir-950">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
+          <p className="text-gray-400">Carregando aula...</p>
+        </div>
       </div>
     );
   }
 
+  if (!lesson) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-noir-950">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Aula não encontrada</p>
+          <Button onClick={() => navigate('/dashboard')}>
+            Voltar ao Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const isCompleted = userProgress?.is_completed || false;
+
   return (
-    <div className="min-h-screen bg-zinc-950">
-      {/* ========== HEADER ========== */}
-      <header className="sticky top-0 z-50 border-b border-zinc-800/50 bg-zinc-950/90 backdrop-blur-sm">
-        <div className="px-4">
-          <div className="flex h-14 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
-                onClick={() => navigate('/dashboard')}
+    <div className="min-h-screen bg-noir-950 text-white">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-zinc-800 bg-noir-950/95 backdrop-blur-lg">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(`/curso/${lesson.module?.course?.slug}`)}
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
               >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <div className="hidden sm:block">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider">{module?.name}</p>
-                <h1 className="text-sm font-medium text-zinc-100 truncate max-w-md">
-                  {lesson?.title}
-                </h1>
-              </div>
+                <ChevronLeft className="w-5 h-5" />
+                <span className="hidden sm:inline">{lesson.module?.course?.name}</span>
+              </button>
             </div>
 
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 lg:hidden"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/dashboard')}
+              className="gap-2 border-zinc-700"
             >
-              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-        {/* ========== MAIN CONTENT ========== */}
-        <main className="flex-1 p-4 lg:p-8">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Video Player */}
-            {lesson?.video_url ? (
-              <div className="rounded-lg overflow-hidden border border-zinc-800/50">
-                <VideoPlayer
-                  youtubeId={lesson.video_url}
-                  onProgress={handleProgress}
-                  onComplete={handleComplete}
-                />
+      {/* Main Content */}
+      <div className="flex flex-col lg:flex-row">
+        {/* Video Section */}
+        <div className="flex-1 p-4 lg:p-8">
+          {/* Video Player */}
+          <div className="rounded-xl overflow-hidden bg-black mb-6">
+            <VideoPlayer
+              videoUrl={lesson.video_url}
+              onProgress={handleProgress}
+              onComplete={markAsCompleted}
+            />
+          </div>
+
+          {/* Lesson Info */}
+          <div className="mb-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="text-sm text-purple-400 mb-1">
+                  {lesson.module?.name}
+                </p>
+                <h1 className="text-2xl md:text-3xl font-bold">
+                  {lesson.title}
+                </h1>
               </div>
-            ) : (
-              <div className="aspect-video bg-zinc-900 rounded-lg overflow-hidden flex items-center justify-center border border-zinc-800/50">
-                <p className="text-zinc-500">Vídeo não disponível</p>
-              </div>
+              
+              {isCompleted ? (
+                <div className="flex items-center gap-2 text-green-400 bg-green-400/10 px-3 py-2 rounded-lg">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-sm font-medium">Concluída</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={markAsCompleted}
+                  variant="outline"
+                  className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Marcar como concluída
+                </Button>
+              )}
+            </div>
+
+            {lesson.description && (
+              <p className="text-gray-400 leading-relaxed">
+                {lesson.description}
+              </p>
             )}
 
-            {/* Lesson Info */}
-            <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/30 p-6">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h1 className="text-xl font-semibold text-zinc-100 mb-2">
-                    {lesson?.title}
-                  </h1>
-                  {lesson?.is_bonus && (
-                    <span className="text-xs bg-amber-500/10 text-amber-500 px-2 py-1 rounded font-medium">
-                      AULA BÔNUS
-                    </span>
-                  )}
-                </div>
-
-                <Button
-                  onClick={handleComplete}
-                  disabled={isCompleted}
-                  className={isCompleted 
-                    ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700" 
-                    : "bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
-                  }
-                >
-                  {isCompleted ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Concluída
-                    </>
-                  ) : (
-                    'Marcar como concluída'
-                  )}
-                </Button>
+            {/* Progress Bar */}
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Progresso desta aula</span>
+                <span className="text-white font-medium">{watchProgress}%</span>
               </div>
-
-              {lesson?.description && (
-                <p className="text-zinc-400 mb-4">{lesson.description}</p>
-              )}
-
-              {/* Progress Bar */}
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-zinc-500">Progresso da aula</span>
-                  <span className="text-zinc-400 font-medium tabular-nums">{watchProgress}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                  <div 
-                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
-                    style={{ width: `${watchProgress}%` }}
-                  />
-                </div>
+              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-300"
+                  style={{ width: `${watchProgress}%` }}
+                />
               </div>
             </div>
-
-            {/* Navigation */}
-            <div className="flex items-center justify-between">
-              {prevLesson ? (
-                <Button
-                  variant="outline"
-                  className="border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
-                  onClick={() => navigate(`/aula/${prevLesson}`)}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Anterior
-                </Button>
-              ) : (
-                <div />
-              )}
-
-              {nextLesson && (
-                <Button 
-                  className="bg-amber-500 text-zinc-900 hover:bg-amber-400 font-medium"
-                  onClick={() => navigate(`/aula/${nextLesson}`)}
-                >
-                  Próxima
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
-            </div>
           </div>
-        </main>
 
-        {/* ========== SIDEBAR ========== */}
-        <aside className={`
-          fixed lg:static inset-y-0 right-0 z-40
-          w-80 bg-zinc-900/50 border-l border-zinc-800/50
-          transform transition-transform lg:transform-none
-          ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
-        `}>
-          <div className="h-full overflow-y-auto p-4">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-4">
-              Conteúdo do curso
-            </h2>
+          {/* Navigation Buttons */}
+          <div className="flex flex-wrap gap-4">
+            {prevLesson ? (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/aula/${prevLesson.id}`)}
+                className="flex-1 min-w-[200px] gap-2 border-zinc-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Aula Anterior
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/curso/${lesson.module?.course?.slug}`)}
+                className="flex-1 min-w-[200px] gap-2 border-zinc-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar ao Curso
+              </Button>
+            )}
 
-            <div className="space-y-6">
-              {sidebarModules.map((mod, modIndex) => (
-                <div key={mod.id}>
-                  <p className="text-xs text-zinc-500 mb-2">
-                    MÓDULO {modIndex + 1}  {mod.name}
-                  </p>
-
-                  <div className="space-y-1">
-                    {mod.lessons.map((sideLesson, lessonIndex) => (
-                      <button
-                        key={sideLesson.id}
-                        onClick={() => {
-                          navigate(`/aula/${sideLesson.id}`);
-                          setSidebarOpen(false);
-                        }}
-                        className={`
-                          w-full flex items-center gap-3 px-3 py-2.5 rounded text-left text-sm transition-colors
-                          ${sideLesson.id === lessonId
-                            ? 'bg-zinc-800 text-zinc-100'
-                            : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100'
-                          }
-                        `}
-                      >
-                        {sideLesson.is_completed ? (
-                          <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-zinc-600 flex-shrink-0" />
-                        )}
-                        <span className="truncate">
-                          {modIndex + 1}.{lessonIndex + 1} {sideLesson.title}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {nextLesson && (
+              <Button
+                onClick={() => navigate(`/aula/${nextLesson.id}`)}
+                className="flex-1 min-w-[200px] gap-2 bg-purple-600 hover:bg-purple-700"
+              >
+                Próxima Aula
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        </aside>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/50">
+          <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
+            <LessonSidebar />
+          </div>
+        </div>
       </div>
-
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }

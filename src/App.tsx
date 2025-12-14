@@ -16,6 +16,8 @@ import Dashboard from './pages/Dashboard';
 import Cursos from './pages/Cursos';
 import CursoDetalhe from './pages/CursoDetalhe';
 import Aula from './pages/Aula';
+import Perfil from './pages/Perfil';
+import Materiais from './pages/Materiais';
 
 // Páginas admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -49,12 +51,8 @@ const App = () => (
               <Route path="/cursos" element={<Cursos />} />
               <Route path="/curso/:courseSlug" element={<CursoDetalhe />} />
               <Route path="/aula/:lessonId" element={<Aula />} />
-              
-              {/* ===== ROTAS ADICIONADAS ===== */}
-              <Route path="/materiais" element={<Dashboard />} />
-              <Route path="/meu-plano" element={<Dashboard />} />
-              <Route path="/comunidade" element={<Dashboard />} />
-              <Route path="/perfil" element={<Dashboard />} />
+              <Route path="/perfil" element={<Perfil />} />
+              <Route path="/materiais" element={<Materiais />} />
 
               {/* Rotas Admin */}
               <Route path="/admin" element={<AdminDashboard />} />
