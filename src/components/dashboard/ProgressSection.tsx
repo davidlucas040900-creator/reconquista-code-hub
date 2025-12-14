@@ -1,10 +1,12 @@
 ﻿// src/components/dashboard/ProgressSection.tsx
 
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProgress } from '@/hooks/useUserProgress';
 import { useUserAccess } from '@/hooks/useUserAccess';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { supabase } from '@/integrations/supabase/client';
 import { Play, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { CourseWithModules } from '@/hooks/useCourses';
@@ -35,6 +37,28 @@ export function ProgressSection({ courses }: ProgressSectionProps) {
   const { data: userProgress, isLoading } = useUserProgress();
   const { data: accessData } = useUserAccess();
   const { getLastLesson } = useVideoProgress();
+  const [userName, setUserName] = useState<string>('');
+
+  // Buscar nome do usuário do banco de dados
+  useEffect(() => {
+    const fetchUserName = async () => {
+      if (!user?.id) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile?.full_name) {
+        // Pegar apenas o primeiro nome
+        const firstName = profile.full_name.split(' ')[0];
+        setUserName(firstName);
+      }
+    };
+
+    fetchUserName();
+  }, [user?.id]);
 
   if (!user) return null;
 
@@ -68,6 +92,9 @@ export function ProgressSection({ courses }: ProgressSectionProps) {
     c => hasFullAccess || purchasedCourses.includes(c.slug)
   );
 
+  // Nome para exibir (prioridade: nome do banco > metadata > primeiro nome do email)
+  const displayName = userName || user.user_metadata?.name || user.email?.split('@')[0] || 'Querida';
+
   if (isLoading) {
     return (
       <section className="px-4 py-6 md:px-8">
@@ -99,7 +126,7 @@ export function ProgressSection({ courses }: ProgressSectionProps) {
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-5 h-5 text-gold" />
                 <span className="text-gold text-sm font-medium">
-                  Olá, {user.user_metadata?.name || user.email?.split('@')[0] || 'Querida'}
+                  Olá, {displayName}
                 </span>
               </div>
               

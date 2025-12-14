@@ -1,6 +1,6 @@
 ﻿// src/components/dashboard/HeroCarousel.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,23 @@ const moduleCTAs: Record<string, string> = {
   'SEGREDOS PROFUNDOS': 'EXPLORAR OS SEGREDOS',
   'DEVOÇÃO ETERNA': 'CONQUISTAR DEVOÇÃO',
   'MENTORIAS E LIVES': 'ACESSAR MENTORIAS',
+  'O Poder da Onisciência': 'OBTER ONISCIÊNCIA',
+  'O Campo de Batalha Digital': 'DOMINAR O DIGITAL',
+  'Acesso ao Cérebro Dele': 'ACESSAR O CÉREBRO',
+  'A Blacklist Masculina': 'VER A BLACKLIST',
+  'O Protocolo de Emergência': 'ATIVAR PROTOCOLO',
+  'O Diário da Deusa (BÓNUS)': 'COMEÇAR O DIÁRIO',
 };
+
+// Função para embaralhar array (Fisher-Yates)
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 export function HeroCarousel({ courses }: HeroCarouselProps) {
   const navigate = useNavigate();
@@ -63,14 +79,17 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
   const touchEndX = useRef(0);
   const { data: accessData } = useUserAccess();
 
-  // Extrair todos os módulos de todos os cursos
-  const allModules = courses.flatMap(course => 
-    (course.course_modules || []).map(module => ({
-      ...module,
-      courseSlug: course.slug,
-      courseName: course.name,
-    }))
-  );
+  // Extrair e embaralhar todos os módulos (ordem aleatória)
+  const allModules = useMemo(() => {
+    const modules = courses.flatMap(course => 
+      (course.course_modules || []).map(module => ({
+        ...module,
+        courseSlug: course.slug,
+        courseName: course.name,
+      }))
+    );
+    return shuffleArray(modules);
+  }, [courses]);
 
   // Auto-scroll
   useEffect(() => {
@@ -132,7 +151,6 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     if (hasAccess && firstLesson) {
       navigate(`/aula/${firstLesson.id}`);
     } else {
-      // Redirecionar para página de vendas
       window.open('https://pay.lojou.co/codigo-reconquista', '_blank');
     }
   };
@@ -158,16 +176,11 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
         <div className="absolute inset-0 bg-gradient-to-r from-noir-950/70 via-transparent to-noir-950/70" />
       </div>
 
-      {/* Content */}
+      {/* Content - SEM TÍTULO, apenas descrição */}
       <div className="relative h-full flex items-center justify-center text-center px-4">
         <div className="max-w-3xl">
-          {/* Título do Módulo */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-playfair font-bold text-white mb-4 md:mb-6 leading-tight">
-            {currentModule.name}
-          </h1>
-
-          {/* Descrição */}
-          <p className="text-gray-200 text-base sm:text-lg md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto leading-relaxed">
+          {/* Descrição - Grande e centralizada */}
+          <p className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-light leading-relaxed mb-8 md:mb-10">
             {moduleDescriptions[currentModule.name] || currentModule.description || 'Transforme sua vida com este módulo exclusivo.'}
           </p>
 
