@@ -83,7 +83,6 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
 
   const handleModuleClick = (module: ModuleWithLessons) => {
     if (!hasAccess) {
-      // Redirecionar para página de vendas
       window.open('https://pay.lojou.co/codigo-reconquista', '_blank');
       return;
     }
@@ -107,7 +106,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
             className="flex items-center gap-1 text-gold hover:text-gold-light transition-colors text-sm font-medium"
           >
             Ver todos
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 w-4" />
           </button>
         </div>
         <p className="text-gray-400 text-sm md:text-base">
@@ -149,10 +148,8 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                   }`} />
                 )}
 
-                {/* Overlay gradiente */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                {/* Lock icon para cursos não comprados */}
                 {!hasAccess && (
                   <div className="absolute bottom-3 right-3">
                     <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center border border-white/20">
@@ -161,7 +158,6 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                   </div>
                 )}
 
-                {/* Play button on hover - apenas se tem acesso */}
                 {hasAccess && (
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gold/90 flex items-center justify-center shadow-xl shadow-gold/30">
@@ -170,7 +166,6 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                   </div>
                 )}
 
-                {/* Progress bar - apenas se tem acesso e progresso */}
                 {hasAccess && progress > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 h-1">
                     <div
