@@ -28,9 +28,9 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-noir-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Carregando cursos...</p>
+        <div className="text-center px-4">
+          <div className="w-12 h-12 md:w-16 md:h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400 text-sm md:text-base">Carregando cursos...</p>
         </div>
       </div>
     );
@@ -39,9 +39,9 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="min-h-screen bg-noir-950 flex items-center justify-center">
-        <div className="text-center text-red-400">
-          <p>Erro ao carregar cursos</p>
-          <p className="text-sm mt-2">{(error as Error).message}</p>
+        <div className="text-center text-red-400 px-4">
+          <p className="text-sm md:text-base">Erro ao carregar cursos</p>
+          <p className="text-xs md:text-sm mt-2">{(error as Error).message}</p>
         </div>
       </div>
     );
@@ -53,7 +53,7 @@ export default function Dashboard() {
       <Header />
 
       {/* Main Content */}
-      <main className="pt-16 pb-24 md:pb-8">
+      <main className="pt-16 pb-20 md:pb-8">
 
         {/* HERO CAROUSEL */}
         <HeroCarousel courses={courses || []} />
@@ -69,13 +69,15 @@ export default function Dashboard() {
         />
 
         {/* COURSE SECTIONS */}
-        {(courses || []).map((course) => (
-          <CourseSection
-            key={course.id}
-            course={course}
-            activeTopicFilter={activeTopic}
-          />
-        ))}
+        <div className="space-y-2 md:space-y-4">
+          {(courses || []).map((course) => (
+            <CourseSection
+              key={course.id}
+              course={course}
+              activeTopicFilter={activeTopic}
+            />
+          ))}
+        </div>
       </main>
 
       {/* Bottom Navigation (Mobile Only) */}

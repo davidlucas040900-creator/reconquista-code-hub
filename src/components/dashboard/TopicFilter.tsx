@@ -1,6 +1,10 @@
 ﻿// src/components/dashboard/TopicFilter.tsx
 
-import { Topic } from '@/types';
+interface Topic {
+  id: string;
+  name: string;
+  icon: string;
+}
 
 interface TopicFilterProps {
   topics: Topic[];
@@ -10,22 +14,22 @@ interface TopicFilterProps {
 
 export function TopicFilter({ topics, activeTopic, onTopicChange }: TopicFilterProps) {
   return (
-    <section className="py-6">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="scroll-container">
-          {topics.map((topic) => (
-            <button
-              key={topic.id}
-              onClick={() => onTopicChange(topic.id)}
-              className={`scroll-item topic-chip ${
-                activeTopic === topic.id ? 'topic-chip-active' : ''
-              }`}
-            >
-              <span>{topic.icon}</span>
-              <span>{topic.name}</span>
-            </button>
-          ))}
-        </div>
+    <section className="px-4 py-4 md:px-8 md:py-6">
+      <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+        {topics.map((topic) => (
+          <button
+            key={topic.id}
+            onClick={() => onTopicChange(topic.id)}
+            className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full whitespace-nowrap transition-all duration-300 text-xs md:text-sm ${
+              activeTopic === topic.id
+                ? 'bg-gold/20 border border-gold/50 text-gold'
+                : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <span>{topic.icon}</span>
+            <span>{topic.name}</span>
+          </button>
+        ))}
       </div>
     </section>
   );

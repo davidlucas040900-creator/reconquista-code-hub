@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { LessonSidebar } from '@/components/LessonSidebar';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Home, CheckCircle } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ChevronLeft, ChevronRight, Home, CheckCircle, List, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Aula() {
@@ -17,6 +18,7 @@ export default function Aula() {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [watchProgress, setWatchProgress] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
@@ -157,27 +159,52 @@ export default function Aula() {
     <div className="min-h-screen bg-noir-950 text-white">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-zinc-800 bg-noir-950/95 backdrop-blur-lg">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="px-4">
+          <div className="flex h-14 items-center justify-between">
+            {/* Left side */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <button
                 onClick={() => navigate(`/curso/${lesson.module?.course?.slug}`)}
-                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors flex-shrink-0"
               >
                 <ChevronLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">{lesson.module?.course?.name}</span>
+                <span className="hidden sm:inline text-sm truncate max-w-[150px]">
+                  {lesson.module?.course?.name}
+                </span>
               </button>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/dashboard')}
-              className="gap-2 border-zinc-700"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </Button>
+            {/* Right side */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/dashboard')}
+                className="gap-1 text-gray-400 hover:text-white"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Button>
+              
+              {/* Mobile: Botão para abrir sidebar */}
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="lg:hidden gap-1">
+                    <List className="h-4 w-4" />
+                    <span className="hidden sm:inline">Aulas</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:w-[400px] p-0 bg-zinc-900 border-zinc-800">
+                  <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                    <h2 className="font-semibold text-white">Conteúdo do Curso</h2>
+                    <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <LessonSidebar />
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
       </header>
@@ -185,9 +212,9 @@ export default function Aula() {
       {/* Main Content */}
       <div className="flex flex-col lg:flex-row">
         {/* Video Section */}
-        <div className="flex-1 p-4 lg:p-8">
+        <div className="flex-1 p-4 lg:p-6">
           {/* Video Player */}
-          <div className="rounded-xl overflow-hidden bg-black mb-6">
+          <div className="rounded-xl overflow-hidden bg-black mb-4 lg:mb-6">
             <VideoPlayer
               videoUrl={lesson.video_url}
               onProgress={handleProgress}
@@ -196,47 +223,49 @@ export default function Aula() {
           </div>
 
           {/* Lesson Info */}
-          <div className="mb-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
+          <div className="mb-4 lg:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+              <div className="min-w-0">
                 <p className="text-sm text-purple-400 mb-1">
                   {lesson.module?.name}
                 </p>
-                <h1 className="text-2xl md:text-3xl font-bold">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold leading-tight">
                   {lesson.title}
                 </h1>
               </div>
-              
+
               {isCompleted ? (
-                <div className="flex items-center gap-2 text-green-400 bg-green-400/10 px-3 py-2 rounded-lg">
-                  <CheckCircle className="w-5 h-5" />
+                <div className="flex items-center gap-2 text-green-400 bg-green-400/10 px-3 py-2 rounded-lg flex-shrink-0 self-start">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="text-sm font-medium">Concluída</span>
                 </div>
               ) : (
                 <Button
                   onClick={markAsCompleted}
                   variant="outline"
-                  className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+                  size="sm"
+                  className="border-green-500/50 text-green-400 hover:bg-green-500/10 flex-shrink-0 self-start"
                 >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Marcar como concluída
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  <span className="hidden sm:inline">Marcar como concluída</span>
+                  <span className="sm:hidden">Concluir</span>
                 </Button>
               )}
             </div>
 
             {lesson.description && (
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-gray-400 leading-relaxed text-sm sm:text-base">
                 {lesson.description}
               </p>
             )}
 
             {/* Progress Bar */}
-            <div className="mt-6">
-              <div className="flex justify-between text-sm mb-2">
+            <div className="mt-4">
+              <div className="flex justify-between text-xs sm:text-sm mb-2">
                 <span className="text-gray-400">Progresso desta aula</span>
                 <span className="text-white font-medium">{watchProgress}%</span>
               </div>
-              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-1.5 sm:h-2 bg-zinc-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-300"
                   style={{ width: `${watchProgress}%` }}
@@ -246,42 +275,45 @@ export default function Aula() {
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             {prevLesson ? (
               <Button
                 variant="outline"
                 onClick={() => navigate(`/aula/${prevLesson.id}`)}
-                className="flex-1 min-w-[200px] gap-2 border-zinc-700"
+                className="flex-1 gap-2 border-zinc-700 text-sm"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Aula Anterior
+                <span className="truncate">Anterior</span>
               </Button>
             ) : (
               <Button
                 variant="outline"
                 onClick={() => navigate(`/curso/${lesson.module?.course?.slug}`)}
-                className="flex-1 min-w-[200px] gap-2 border-zinc-700"
+                className="flex-1 gap-2 border-zinc-700 text-sm"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Voltar ao Curso
+                <span className="truncate">Voltar ao Curso</span>
               </Button>
             )}
 
             {nextLesson && (
               <Button
                 onClick={() => navigate(`/aula/${nextLesson.id}`)}
-                className="flex-1 min-w-[200px] gap-2 bg-purple-600 hover:bg-purple-700"
+                className="flex-1 gap-2 bg-purple-600 hover:bg-purple-700 text-sm"
               >
-                Próxima Aula
+                <span className="truncate">Próxima Aula</span>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/50">
-          <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-[350px] xl:w-[400px] border-l border-zinc-800 bg-zinc-900/50">
+          <div className="sticky top-14 h-[calc(100vh-3.5rem)] overflow-hidden">
+            <div className="p-4 border-b border-zinc-800">
+              <h2 className="font-semibold text-white">Conteúdo do Curso</h2>
+            </div>
             <LessonSidebar />
           </div>
         </div>
