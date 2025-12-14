@@ -1,13 +1,18 @@
 ﻿// src/components/dashboard/HeroCarousel.tsx
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, ChevronRight } from 'lucide-react';
-import { Course } from '@/types';
+import { Course, Module } from '@/types';
 
 interface HeroCarouselProps {
   courses: Course[];
   autoPlayInterval?: number;
+}
+
+interface SlideData {
+  module: Module;
+  course: Course;
 }
 
 export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselProps) {
@@ -15,30 +20,46 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  const purchasedCourses = courses.filter(c => c.isPurchased);
-  const displayCourses = purchasedCourses.length > 0 ? purchasedCourses : courses;
+  // Criar array com TODOS os módulos de TODOS os cursos
+  const allSlides: SlideData[] = useMemo(() => {
+    const slides: SlideData[] = [];
+    
+    courses.forEach((course) => {
+      course.modules.forEach((module) => {
+        slides.push({
+          module,
+          course,
+        });
+      });
+    });
+    
+    return slides;
+  }, [courses]);
 
+  // Avançar para próximo slide (loop infinito)
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % displayCourses.length);
-  }, [displayCourses.length]);
+    setCurrentIndex((prev) => (prev + 1) % allSlides.length);
+  }, [allSlides.length]);
 
+  // Auto-play com loop infinito
   useEffect(() => {
-    if (isPaused || displayCourses.length <= 1) return;
+    if (isPaused || allSlides.length <= 1) return;
 
     const interval = setInterval(nextSlide, autoPlayInterval);
     return () => clearInterval(interval);
-  }, [isPaused, nextSlide, autoPlayInterval, displayCourses.length]);
+  }, [isPaused, nextSlide, autoPlayInterval, allSlides.length]);
 
-  const handleModuleClick = (course: Course) => {
-    if (course.isPurchased) {
-      navigate(`/curso/${course.slug}`);
+  const handleSlideClick = (slide: SlideData) => {
+    const isLocked = !slide.course.isPurchased || slide.module.isLocked;
+    
+    if (isLocked) {
+      window.open(`/vendas/${slide.course.slug}`, '_blank');
     } else {
-      // Navegar para página de vendas
-      window.open(`/vendas/${course.slug}`, '_blank');
+      navigate(`/curso/${slide.course.slug}?module=${slide.module.id}`);
     }
   };
 
-  if (displayCourses.length === 0) return null;
+  if (allSlides.length === 0) return null;
 
   return (
     <section
@@ -51,13 +72,13 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
         className="carousel-track h-full"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
-        {displayCourses.map((course, index) => (
-          <div key={course.id} className="carousel-slide h-full">
+        {allSlides.map((slide) => (
+          <div key={`${slide.course.id}-${slide.module.id}`} className="carousel-slide h-full">
             {/* Background Image */}
             <div className="absolute inset-0">
               <img
-                src={course.heroImage}
-                alt={course.name}
+                src={slide.module.image}
+                alt={slide.module.title}
                 className="w-full h-full object-cover"
               />
               {/* Gradient Overlay */}
@@ -69,32 +90,23 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
             <div className="relative z-10 h-full flex items-center">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
                 <div className="max-w-2xl">
-                  {/* Module Badge */}
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 border border-gold/30 mb-6">
-                    <span className="text-gold text-sm font-medium">
-                      MÓDULO {index + 1}
-                    </span>
-                  </div>
-
                   {/* Title */}
                   <h2 className="heading-hero mb-4">
-                    {course.modules[0]?.title || course.name}
+                    {slide.module.title}
                   </h2>
 
                   {/* Description */}
                   <p className="text-body text-lg mb-8 max-w-lg">
-                    {course.modules[0]?.description || course.description}
+                    {slide.module.description}
                   </p>
 
                   {/* CTA */}
                   <button
-                    onClick={() => handleModuleClick(course)}
+                    onClick={() => handleSlideClick(slide)}
                     className="btn-gold text-lg group"
                   >
                     <Play className="w-5 h-5" />
-                    <span>
-                      {course.isPurchased ? 'COMEÇAR AGORA' : 'DESBLOQUEAR ACESSO'}
-                    </span>
+                    <span>COMEÇAR AGORA</span>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
@@ -105,9 +117,9 @@ export function HeroCarousel({ courses, autoPlayInterval = 5000 }: HeroCarouselP
       </div>
 
       {/* Indicators */}
-      {displayCourses.length > 1 && (
+      {allSlides.length > 1 && (
         <div className="carousel-indicators">
-          {displayCourses.map((_, index) => (
+          {allSlides.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
