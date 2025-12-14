@@ -13,7 +13,6 @@ export function CourseSection({ course }: CourseSectionProps) {
 
   const handleModuleClick = (moduleId: string, isLocked: boolean) => {
     if (isLocked) {
-      // Navegar para página de vendas
       window.open(`/vendas/${course.slug}`, '_blank');
     } else {
       navigate(`/curso/${course.slug}?module=${moduleId}`);
@@ -55,25 +54,27 @@ export function CourseSection({ course }: CourseSectionProps) {
                 onClick={() => handleModuleClick(module.id, isLocked)}
                 className="scroll-item w-40 md:w-48"
               >
-                <div className="card-module">
-                  {/* Image */}
+                <div className="card-module group">
+                  {/* Image - SEM BLUR, apenas opacidade reduzida se bloqueado */}
                   <img
                     src={module.image}
                     alt={module.title}
-                    className={`card-module-image ${isLocked ? 'card-module-locked' : ''}`}
+                    className={`card-module-image ${isLocked ? 'opacity-60' : ''}`}
                   />
 
-                  {/* Overlay */}
+                  {/* Overlay gradiente */}
                   <div className="card-module-overlay" />
 
-                  {/* Lock Icon */}
+                  {/* Cadeado pequeno no canto inferior direito */}
                   {isLocked && (
-                    <div className="lock-overlay">
-                      <Lock className="lock-icon" />
+                    <div className="absolute bottom-3 right-3 z-10">
+                      <div className="w-7 h-7 rounded-full bg-black/70 backdrop-blur-sm flex items-center justify-center border border-gold/30">
+                        <Lock className="w-3.5 h-3.5 text-gold" />
+                      </div>
                     </div>
                   )}
 
-                  {/* Progress Indicator */}
+                  {/* Progress Indicator - só aparece se não bloqueado e tem progresso */}
                   {!isLocked && progress > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
                       <div
@@ -81,6 +82,11 @@ export function CourseSection({ course }: CourseSectionProps) {
                         style={{ width: `${progress}%` }}
                       />
                     </div>
+                  )}
+
+                  {/* Hover effect para módulos desbloqueados */}
+                  {!isLocked && (
+                    <div className="absolute inset-0 bg-gold/0 group-hover:bg-gold/10 transition-colors duration-300 rounded-xl" />
                   )}
                 </div>
               </button>

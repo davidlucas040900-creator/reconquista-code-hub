@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import { Header } from '@/components/layout/Header';
-import { WhatsAppFab } from '@/components/layout/WhatsAppFab';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { HeroCarousel } from '@/components/dashboard/HeroCarousel';
 import { TopicFilter } from '@/components/dashboard/TopicFilter';
@@ -11,39 +10,56 @@ import { CourseSection } from '@/components/dashboard/CourseSection';
 import { courses, topics, mockUser } from '@/data/mockData';
 
 export default function Dashboard() {
-  const [activeTopic, setActiveTopic] = useState('all');
+  // Estado para o filtro de tópicos ACIMA do Hero (controla o carousel)
+  const [topicAbove, setTopicAbove] = useState('all');
+  
+  // Estado para o filtro de tópicos ABAIXO do Hero (controla os cursos)
+  const [topicBelow, setTopicBelow] = useState('all');
 
-  // Filtrar cursos por tópico
-  const filteredCourses = useMemo(() => {
-    if (activeTopic === 'all') return courses;
-    return courses.filter(course => course.topics.includes(activeTopic));
-  }, [activeTopic]);
+  // Filtrar cursos para o Hero Carousel (filtro de cima)
+  const filteredCoursesHero = useMemo(() => {
+    if (topicAbove === 'all') return courses;
+    return courses.filter(course => course.topics.includes(topicAbove));
+  }, [topicAbove]);
+
+  // Filtrar cursos para as seções abaixo (filtro de baixo)
+  const filteredCoursesSections = useMemo(() => {
+    if (topicBelow === 'all') return courses;
+    return courses.filter(course => course.topics.includes(topicBelow));
+  }, [topicBelow]);
 
   return (
     <div className="min-h-screen bg-noir-950">
       {/* Header Fixo */}
       <Header />
 
-      {/* WhatsApp FAB */}
-      <WhatsAppFab />
-
       {/* Main Content */}
       <main className="pt-16 pb-24 md:pb-8">
-        {/* Hero Carousel */}
-        <HeroCarousel courses={filteredCourses} />
-
-        {/* Topic Filter */}
+        
+        {/*  FILTRO DE TÓPICOS - ACIMA DO HERO  */}
         <TopicFilter
           topics={topics}
-          activeTopic={activeTopic}
-          onTopicChange={setActiveTopic}
+          activeTopic={topicAbove}
+          onTopicChange={setTopicAbove}
+          label="Explorar Módulos"
         />
 
-        {/* Progress Section */}
+        {/*  HERO CAROUSEL  */}
+        <HeroCarousel courses={filteredCoursesHero} />
+
+        {/*  FILTRO DE TÓPICOS - ABAIXO DO HERO  */}
+        <TopicFilter
+          topics={topics}
+          activeTopic={topicBelow}
+          onTopicChange={setTopicBelow}
+          label="Filtrar Cursos"
+        />
+
+        {/*  PROGRESS SECTION  */}
         <ProgressSection user={mockUser} courses={courses} />
 
-        {/* Course Sections */}
-        {filteredCourses.map((course) => (
+        {/*  COURSE SECTIONS (Filtradas pelo tópico de baixo)  */}
+        {filteredCoursesSections.map((course) => (
           <CourseSection key={course.id} course={course} />
         ))}
       </main>
