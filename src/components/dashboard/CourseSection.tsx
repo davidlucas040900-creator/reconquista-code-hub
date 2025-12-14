@@ -24,7 +24,7 @@ const santuarioModuleDescriptions: Record<string, string> = {
   'poder-onisciencia': 'Detecta mentiras e nunca mais seja enganada.',
   'campo-batalha-digital': 'Posts estratégicos que ativam ciúmes e desejo.',
   'acesso-cerebro': 'Respostas que desarmam qualquer ego masculino.',
-  'blacklist-masculina': 'Neutraliza homens perigosos antes que magoem.',
+  'blacklist-masculina': 'Neutraliza homens perigosos e poupe anos de sofrimento',
   'protocolo-emergencia': 'Áudios de emergência para momentos críticos',
   'diario-deusa': 'Áudios contra momentos de fraqueza.',
   'mentorias-lives': 'Acelere seus resultados 10x mais rápido',
