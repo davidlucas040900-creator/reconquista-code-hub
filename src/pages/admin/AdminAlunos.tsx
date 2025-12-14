@@ -1,246 +1,307 @@
-// src/pages/admin/AdminAlunos.tsx
+﻿// src/pages/admin/AdminAlunos.tsx
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { useAdminStudents } from '@/hooks/useAdminStudents';
+import { useCourses } from '@/hooks/useCourses';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
-import { Search, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Search,
+  Lock,
+  Unlock,
+  Key,
+  BookOpen,
+  Ban,
+  CheckCircle,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
-
-interface Aluno {
-  id: string;
-  email: string;
-  full_name: string | null;
-  whatsapp: string | null;
-  has_full_access: boolean;
-  created_at: string;
-  purchase_date: string | null;
-}
-
-interface AlunoProgress {
-  lessonTitle: string;
-  completed: boolean;
-  watchPercentage: number;
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function AdminAlunos() {
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [filteredAlunos, setFilteredAlunos] = useState<Aluno[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
-  const [alunoProgress, setAlunoProgress] = useState<AlunoProgress[]>([]);
-  const [progressLoading, setProgressLoading] = useState(false);
+  const { students, isLoading, toggleAccess, resetPassword, grantCourseAccess, revokeCourseAccess, blockModule, unblockModule } = useAdminStudents();
+  const { data: courses } = useCourses();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showCourseDialog, setShowCourseDialog] = useState(false);
+  const [showModuleDialog, setShowModuleDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState('');
+  const [selectedModule, setSelectedModule] = useState('');
+  const [blockReason, setBlockReason] = useState('');
 
-  useEffect(() => {
-    fetchAlunos();
-  }, []);
+  const filteredStudents = students?.filter((s) =>
+    s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  useEffect(() => {
-    if (search) {
-      const filtered = alunos.filter(
-        (a) =>
-          a.email.toLowerCase().includes(search.toLowerCase()) ||
-          a.full_name?.toLowerCase().includes(search.toLowerCase())
-      );
-      setFilteredAlunos(filtered);
-    } else {
-      setFilteredAlunos(alunos);
-    }
-  }, [search, alunos]);
-
-  const fetchAlunos = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'user')
-      .order('created_at', { ascending: false });
-
-    setAlunos(data || []);
-    setFilteredAlunos(data || []);
-    setLoading(false);
+  const handleResetPassword = () => {
+    if (!selectedStudent || !newPassword) return;
+    resetPassword({ userId: selectedStudent.id, newPassword });
+    setShowPasswordDialog(false);
+    setNewPassword('');
   };
 
-  const viewProgress = async (aluno: Aluno) => {
-    setSelectedAluno(aluno);
-    setProgressLoading(true);
-
-    const { data } = await supabase
-      .from('user_lesson_progress')
-      .select(`
-        *,
-        course_lessons:lesson_id (title)
-      `)
-      .eq('user_id', aluno.id);
-
-    const progress: AlunoProgress[] = (data || []).map((p: any) => ({
-      lessonTitle: p.course_lessons?.title || 'Aula',
-      completed: p.is_completed,
-      watchPercentage: p.watch_percentage || 0,
-    }));
-
-    setAlunoProgress(progress);
-    setProgressLoading(false);
+  const handleGrantCourse = () => {
+    if (!selectedStudent || !selectedCourse) return;
+    grantCourseAccess({ userId: selectedStudent.id, courseId: selectedCourse });
+    setShowCourseDialog(false);
+    setSelectedCourse('');
   };
 
-  const toggleAccess = async (aluno: Aluno) => {
-    await supabase
-      .from('profiles')
-      .update({ has_full_access: !aluno.has_full_access })
-      .eq('id', aluno.id);
-
-    fetchAlunos();
+  const handleBlockModule = () => {
+    if (!selectedStudent || !selectedModule) return;
+    blockModule({ userId: selectedStudent.id, moduleId: selectedModule, reason: blockReason });
+    setShowModuleDialog(false);
+    setSelectedModule('');
+    setBlockReason('');
   };
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-gray-400">Carregando alunos...</div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
-    <AdminLayout title="Alunos" breadcrumb={[{ label: 'Alunos' }]}>
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Gerenciar Alunos</h1>
+            <p className="text-gray-400 mt-1">
+              Total: {students?.length || 0} alunos
+            </p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
-            placeholder="Buscar por nome ou email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            placeholder="Buscar por email ou nome..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-zinc-900 border-zinc-800 text-white"
           />
         </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3 mb-6">
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Total de Alunos</p>
-          <p className="text-2xl font-semibold">{alunos.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Com Acesso</p>
-          <p className="text-2xl font-semibold text-green-600">
-            {alunos.filter((a) => a.has_full_access).length}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Sem Acesso</p>
-          <p className="text-2xl font-semibold text-red-600">
-            {alunos.filter((a) => !a.has_full_access).length}
-          </p>
-        </Card>
-      </div>
-
-      {/* Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Nome</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Email</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">WhatsApp</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Acesso</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Cadastro</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    Carregando...
-                  </td>
-                </tr>
-              ) : filteredAlunos.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    Nenhum aluno encontrado.
-                  </td>
-                </tr>
-              ) : (
-                filteredAlunos.map((aluno) => (
-                  <tr key={aluno.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-foreground">
-                      {aluno.full_name || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{aluno.email}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {aluno.whatsapp || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {aluno.has_full_access ? (
-                        <span className="inline-flex items-center gap-1 text-sm text-green-600">
-                          <CheckCircle className="h-4 w-4" />
-                          Ativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-sm text-red-600">
-                          <XCircle className="h-4 w-4" />
-                          Inativo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {new Date(aluno.created_at).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => viewProgress(aluno)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={aluno.has_full_access ? 'outline' : 'default'}
-                          size="sm"
-                          onClick={() => toggleAccess(aluno)}
-                        >
-                          {aluno.has_full_access ? 'Revogar' : 'Liberar'}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Progress Modal */}
-      <Dialog open={!!selectedAluno} onOpenChange={() => setSelectedAluno(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Progresso de {selectedAluno?.full_name || selectedAluno?.email}</DialogTitle>
-          </DialogHeader>
-
-          {progressLoading ? (
-            <p className="text-muted-foreground">Carregando...</p>
-          ) : alunoProgress.length === 0 ? (
-            <p className="text-muted-foreground">Nenhum progresso registrado.</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {alunoProgress.map((p, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div className="flex items-center gap-2">
-                    {p.completed ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+        {/* Students List */}
+        <div className="grid gap-4">
+          {filteredStudents?.map((student) => (
+            <Card key={student.id} className="bg-zinc-900 border-zinc-800 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-white">
+                      {student.full_name || 'Sem nome'}
+                    </h3>
+                    {student.has_full_access ? (
+                      <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                        ACESSO TOTAL
+                      </span>
                     ) : (
-                      <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
+                      <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">
+                        BLOQUEADO
+                      </span>
                     )}
-                    <span className="text-sm">{p.lessonTitle}</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">{p.watchPercentage}%</span>
+                  <p className="text-gray-400 text-sm mt-1">{student.email}</p>
+                  {student.whatsapp && (
+                    <p className="text-gray-500 text-xs mt-1">
+                      WhatsApp: {student.whatsapp}
+                    </p>
+                  )}
                 </div>
-              ))}
+
+                <div className="flex gap-2">
+                  {/* Bloquear/Desbloquear */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAccess({ userId: student.id, hasAccess: student.has_full_access })}
+                    className="border-zinc-700"
+                  >
+                    {student.has_full_access ? (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Bloquear
+                      </>
+                    ) : (
+                      <>
+                        <Unlock className="w-4 h-4 mr-2" />
+                        Desbloquear
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Trocar Senha */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedStudent(student);
+                      setShowPasswordDialog(true);
+                    }}
+                    className="border-zinc-700"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    Senha
+                  </Button>
+
+                  {/* Gerenciar Cursos */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedStudent(student);
+                      setShowCourseDialog(true);
+                    }}
+                    className="border-zinc-700"
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Cursos
+                  </Button>
+
+                  {/* Bloquear Módulo */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedStudent(student);
+                      setShowModuleDialog(true);
+                    }}
+                    className="border-zinc-700"
+                  >
+                    <Ban className="w-4 h-4 mr-2" />
+                    Módulos
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialog: Trocar Senha */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Trocar Senha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nova Senha</Label>
+              <Input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Digite a nova senha"
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
             </div>
-          )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleResetPassword}>Alterar Senha</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Gerenciar Cursos */}
+      <Dialog open={showCourseDialog} onOpenChange={setShowCourseDialog}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Acesso a Cursos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Selecionar Curso</Label>
+              <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                  <SelectValue placeholder="Escolha um curso" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700 text-white">
+                  {courses?.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCourseDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGrantCourse}>Dar Acesso</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Bloquear Módulo */}
+      <Dialog open={showModuleDialog} onOpenChange={setShowModuleDialog}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Bloquear Módulo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Selecionar Módulo</Label>
+              <Select value={selectedModule} onValueChange={setSelectedModule}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
+                  <SelectValue placeholder="Escolha um módulo" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700 text-white">
+                  {courses?.flatMap((c) => c.course_modules || []).map((module) => (
+                    <SelectItem key={module.id} value={module.id}>
+                      {module.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Motivo (opcional)</Label>
+              <Textarea
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="Descreva o motivo do bloqueio..."
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowModuleDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleBlockModule}>Bloquear Módulo</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminLayout>
