@@ -25,6 +25,7 @@ import AdminCursos from './pages/admin/AdminCursos';
 import AdminCursoDetalhe from './pages/admin/AdminCursoDetalhe';
 import AdminAlunos from './pages/admin/AdminAlunos';
 import AdminConfiguracoes from './pages/admin/AdminConfiguracoes';
+import AdminNotificacoes from './pages/admin/AdminNotificacoes';
 
 // Outras páginas
 import TestPlyr from './pages/TestPlyr';
@@ -60,6 +61,10 @@ const App = () => (
               <Route path="/admin/cursos/:courseId" element={<AdminCursoDetalhe />} />
               <Route path="/admin/alunos" element={<AdminAlunos />} />
               <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
+              <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
+              <Route path="/admin/materiais" element={<AdminConfiguracoes />} />
+              <Route path="/admin/drip-content" element={<AdminConfiguracoes />} />
+              <Route path="/admin/acessos" element={<AdminAlunos />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
