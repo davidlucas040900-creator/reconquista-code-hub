@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUserAccess } from '@/hooks/useUserAccess';
 import type { CourseWithModules } from '@/hooks/useCourses';
@@ -34,31 +34,6 @@ const moduleDescriptions: Record<string, string> = {
   'A Blacklist Masculina': 'O que nunca fazer se queres ele de volta.',
   'O Protocolo de Emergência': 'Plano de ação para situações críticas.',
   'O Diário da Deusa (BÓNUS)': 'Exercícios diários para sua transformação.',
-};
-
-// CTAs personalizados
-const moduleCTAs: Record<string, string> = {
-  'RESET EMOCIONAL': 'COMEÇAR O RESET AGORA',
-  'MAPA DA MENTE MASCULINA': 'DESVENDAR A MENTE DELE',
-  'GATILHOS DA MEMÓRIA EMOCIONAL': 'ATIVAR OS GATILHOS',
-  'A FRASE DE 5 PALAVRAS': 'DESCOBRIR A FRASE',
-  'PRIMEIRO CONTATO ESTRATÉGICO': 'INICIAR O CONTATO',
-  'DOMÍNIO DA CONVERSA': 'DOMINAR A CONVERSA',
-  'CONQUISTA DURADOURA': 'GARANTIR A CONQUISTA',
-  'O DESPERTAR DA DEUSA': 'DESPERTAR AGORA',
-  'O TOQUE VICIANTE': 'APRENDER O TOQUE',
-  'O SEGREDO ORAL': 'DESCOBRIR O SEGREDO',
-  'A CAVALGADA DA DEUSA': 'DOMINAR A TÉCNICA',
-  'O BIG BANG SONORO': 'APRENDER OS SONS',
-  'SEGREDOS PROFUNDOS': 'EXPLORAR OS SEGREDOS',
-  'DEVOÇÃO ETERNA': 'CONQUISTAR DEVOÇÃO',
-  'MENTORIAS E LIVES': 'ACESSAR MENTORIAS',
-  'O Poder da Onisciência': 'OBTER ONISCIÊNCIA',
-  'O Campo de Batalha Digital': 'DOMINAR O DIGITAL',
-  'Acesso ao Cérebro Dele': 'ACESSAR O CÉREBRO',
-  'A Blacklist Masculina': 'VER A BLACKLIST',
-  'O Protocolo de Emergência': 'ATIVAR PROTOCOLO',
-  'O Diário da Deusa (BÓNUS)': 'COMEÇAR O DIÁRIO',
 };
 
 // Função para embaralhar array (Fisher-Yates)
@@ -176,20 +151,21 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
         <div className="absolute inset-0 bg-gradient-to-r from-noir-950/70 via-transparent to-noir-950/70" />
       </div>
 
-      {/* Content - SEM TÍTULO, apenas descrição */}
-      <div className="relative h-full flex items-center justify-center text-center px-4">
+      {/* Content - Descrição cinza + CTA mais abaixo */}
+      <div className="relative h-full flex items-end justify-center text-center px-4 pb-16 md:pb-20">
         <div className="max-w-3xl">
-          {/* Descrição - Grande e centralizada */}
-          <p className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-light leading-relaxed mb-8 md:mb-10">
+          {/* Descrição - Cor cinza como nas outras seções */}
+          <p className="text-gray-400 text-base sm:text-lg md:text-xl lg:text-2xl font-light leading-relaxed mb-6 md:mb-8">
             {moduleDescriptions[currentModule.name] || currentModule.description || 'Transforme sua vida com este módulo exclusivo.'}
           </p>
 
-          {/* CTA Button */}
+          {/* CTA Único - ASSISTIR AGORA com ícone play */}
           <Button
             onClick={handleClick}
-            className="bg-gold hover:bg-gold-light text-noir-950 font-bold text-sm md:text-base px-8 py-4 md:px-10 md:py-5 rounded-full shadow-xl shadow-gold/30 transition-all hover:scale-105"
+            className="bg-gold hover:bg-gold-light text-noir-950 font-bold text-sm md:text-base px-6 py-3 md:px-8 md:py-4 rounded-full shadow-xl shadow-gold/30 transition-all hover:scale-105 inline-flex items-center gap-2"
           >
-            {moduleCTAs[currentModule.name] || 'COMEÇAR AGORA'}
+            <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
+            ASSISTIR AGORA
           </Button>
         </div>
       </div>
