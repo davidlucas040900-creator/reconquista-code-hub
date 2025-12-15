@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -25,10 +25,24 @@ const PRODUCT_MAP: Record<string, { name: string; accessKey: string }> = {
   'exclusivo-1': { name: 'Acesso Exclusivo para os 1%', accessKey: 'exclusivo_1percent' },
 }
 
+// Gerar token seguro
+function generateSecureToken(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
+  let webhookLogId: string | null = null
 
   try {
     const supabaseAdmin = createClient(
@@ -116,6 +130,7 @@ serve(async (req) => {
           source: 'lojou_pay',
           first_product: product.name
         }
+        // SEM PASSWORD! Utilizador só entra via Magic Link
       })
 
       if (createError || !newUser?.user) {
@@ -327,7 +342,18 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[Lojou Webhook] Erro:', error)
+    console.error('❌ ERRO NO WEBHOOK:', error)
+
+    if (webhookLogId) {
+      await supabaseAdmin
+        .from('payment_webhooks')
+        .update({ 
+          processed: false,
+          error_message: error.message || 'Erro desconhecido'
+        })
+        .eq('id', webhookLogId)
+    }
+
     return new Response(
       JSON.stringify({ error: error.message || 'Erro interno' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
