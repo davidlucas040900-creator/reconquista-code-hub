@@ -15,36 +15,19 @@ const AutoLogin = () => {
 
   useEffect(() => {
     const processAutoLogin = async () => {
-      const token = searchParams.get('token');
-
-      // Se ja tem hash na URL (retorno do Supabase), processar sessao
-      const hash = window.location.hash;
-      if (hash && hash.includes('access_token')) {
-        console.log('[AutoLogin] Processando hash do Supabase...');
-        setMessage('Finalizando login...');
-        
-        // O Supabase vai processar automaticamente
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (session) {
-          console.log('[AutoLogin] Sessao ativa!');
-          setStatus('success');
-          setMessage('Bem-vinda! Redirecionando...');
-          toast.success('Login realizado com sucesso!');
-          
-          // Limpar hash e redirecionar
-          window.history.replaceState(null, '', '/dashboard');
-          setTimeout(() => navigate('/dashboard'), 500);
-          return;
-        }
-        
-        if (error) {
-          console.log('[AutoLogin] Erro na sessao:', error.message);
-        }
+      // Verificar se ja esta logado
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      if (existingSession) {
+        console.log('[AutoLogin] Ja logado, redirecionando...');
+        setStatus('success');
+        setMessage('Voce ja esta logado! Redirecionando...');
+        setTimeout(() => navigate('/dashboard'), 500);
+        return;
       }
 
-      console.log('[AutoLogin] Token:', token?.substring(0, 20) + '...');
-
+      const token = searchParams.get('token');
+      console.log('[AutoLogin] Processando token...');
+      
       if (!token) {
         setStatus('error');
         setMessage('Link invalido. Token nao encontrado.');
@@ -69,29 +52,33 @@ const AutoLogin = () => {
           return;
         }
 
-        // Se temos action_link, redirecionar IMEDIATAMENTE
-        if (data.action_link) {
-          console.log('[AutoLogin] Redirecionando para action_link...');
-          setStatus('success');
-          setMessage('Acesso confirmado! Redirecionando...');
+        if (data.access_token && data.refresh_token) {
+          setMessage('Criando sessao...');
           
-          // Redirecionar imediatamente sem delay
-          window.location.href = data.action_link;
-          return;
-        }
+          // Definir sessao com os tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token
+          });
 
-        // Fallback: verificar sessao existente
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session) {
+          if (sessionError) {
+            console.error('[AutoLogin] Erro sessao:', sessionError);
+            setStatus('error');
+            setMessage('Erro ao criar sessao. Tente novamente.');
+            return;
+          }
+
+          console.log('[AutoLogin] Sessao criada!');
           setStatus('success');
-          setMessage('Acesso confirmado! Redirecionando...');
-          toast.success('Bem-vinda de volta!');
-          setTimeout(() => navigate('/dashboard'), 500);
+          setMessage('Bem-vinda! Redirecionando...');
+          toast.success('Login realizado com sucesso!');
+          
+          setTimeout(() => navigate('/dashboard'), 1000);
           return;
         }
 
         setStatus('error');
-        setMessage('Erro ao processar o acesso. Solicite um novo link.');
+        setMessage('Erro ao processar login.');
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);
@@ -106,7 +93,6 @@ const AutoLogin = () => {
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-8">
-
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
             <Crown className="w-6 h-6 text-black" />
@@ -149,12 +135,6 @@ const AutoLogin = () => {
             >
               Solicitar Novo Link
             </Button>
-            <p className="text-gray-500 text-sm">
-              Precisa de ajuda?{' '}
-              <a href="https://wa.me/258849999999" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">
-                Fale conosco
-              </a>
-            </p>
           </div>
         )}
 
