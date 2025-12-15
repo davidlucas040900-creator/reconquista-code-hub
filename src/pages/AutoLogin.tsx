@@ -15,7 +15,7 @@ const AutoLogin = () => {
     const processAutoLogin = async () => {
       const token = searchParams.get('token');
 
-      console.log('=== AUTO LOGIN INICIADO ===');
+      console.log('[AutoLogin] Iniciando com token:', token?.substring(0, 20) + '...');
 
       if (!token) {
         setStatus('error');
@@ -24,59 +24,74 @@ const AutoLogin = () => {
       }
 
       try {
-        // 1. Chamar Edge Function para verificar token e obter action_link
-        console.log('Verificando token via Edge Function...');
+        setMessage('Validando seu acesso...');
+        
+        // Timeout de 15 segundos
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        console.log('[AutoLogin] Chamando verify-magic-link...');
         
         const { data, error } = await supabase.functions.invoke('verify-magic-link', {
           body: { token }
         });
 
-        console.log('Resposta da Edge Function:', { data, error });
+        clearTimeout(timeoutId);
+
+        console.log('[AutoLogin] Resposta:', { data, error });
 
         if (error) {
-          console.error('Erro na Edge Function:', error);
+          console.error('[AutoLogin] Erro na funcao:', error);
           setStatus('error');
           setMessage(error.message || 'Erro ao verificar o link.');
           return;
         }
 
         if (!data?.success) {
+          console.log('[AutoLogin] Verificacao falhou:', data?.error);
           setStatus('error');
           setMessage(data?.error || 'Link expirado ou ja utilizado.');
           return;
         }
 
-        // 2. Se temos action_link, redirecionar para ele
+        // Sucesso! Redirecionar para o action_link
         if (data.action_link) {
-          console.log('Redirecionando para action_link do Supabase...');
+          console.log('[AutoLogin] Redirecionando para action_link...');
           setStatus('success');
           setMessage('Acesso confirmado! Redirecionando...');
           
-          // O action_link do Supabase vai autenticar automaticamente
-          window.location.href = data.action_link;
+          // Pequeno delay para mostrar mensagem de sucesso
+          setTimeout(() => {
+            window.location.href = data.action_link;
+          }, 500);
           return;
         }
 
-        // 3. Fallback - verificar se ja esta logado
+        // Fallback - verificar sessao existente
         const { data: sessionData } = await supabase.auth.getSession();
-        
         if (sessionData?.session) {
-          console.log('Sessao ja existe, redirecionando...');
+          console.log('[AutoLogin] Sessao existente encontrada');
           setStatus('success');
           setMessage('Acesso confirmado! Redirecionando...');
           toast.success('Bem-vinda de volta!');
-          setTimeout(() => navigate('/dashboard'), 1000);
+          setTimeout(() => navigate('/dashboard'), 500);
           return;
         }
 
-        // 4. Se nada funcionou
+        // Nada funcionou
         setStatus('error');
         setMessage('Erro ao processar o acesso. Tente novamente.');
 
       } catch (error: any) {
-        console.error('Erro geral no auto-login:', error);
-        setStatus('error');
-        setMessage('Erro inesperado. Tente fazer login manual.');
+        console.error('[AutoLogin] Erro geral:', error);
+        
+        if (error.name === 'AbortError') {
+          setStatus('error');
+          setMessage('A verificacao demorou muito. Tente novamente.');
+        } else {
+          setStatus('error');
+          setMessage('Erro inesperado. Tente fazer login manual.');
+        }
       }
     };
 
@@ -133,7 +148,7 @@ const AutoLogin = () => {
               onClick={() => navigate('/login')}
               className="w-full h-12 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-semibold rounded-xl"
             >
-              Ir para Login
+              Solicitar Novo Link
             </Button>
 
             <p className="text-gray-500 text-sm">
