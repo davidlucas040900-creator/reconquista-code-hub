@@ -20,12 +20,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    fullName: string,
-    whatsapp: string
-  ) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, whatsapp: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -38,9 +33,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Funcao para buscar perfil do usuario
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('[Auth] Buscando perfil para:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -48,18 +43,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Erro ao buscar perfil:', error);
+        console.error('[Auth] Erro ao buscar perfil:', error);
         return null;
       }
 
+      console.log('[Auth] Perfil encontrado:', data?.email);
       return data as Profile;
     } catch (error) {
-      console.error('Erro ao buscar perfil:', error);
+      console.error('[Auth] Erro ao buscar perfil:', error);
       return null;
     }
   };
 
-  // Funcao para atualizar perfil
   const refreshProfile = async () => {
     if (user?.id) {
       const profileData = await fetchProfile(user.id);
@@ -72,21 +67,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initAuth = async () => {
       try {
-        // Buscar sessao existente
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Auth] Iniciando autenticacao...');
         
-        if (mounted && session?.user) {
-          setSession(session);
-          setUser(session.user);
+        // IMPORTANTE: Verificar se tem hash na URL (magic link)
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token')) {
+          console.log('[Auth] Hash detectado, processando magic link...');
           
-          // Buscar perfil do usuario
-          const profileData = await fetchProfile(session.user.id);
+          // Extrair tokens do hash
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          
+          if (accessToken && refreshToken) {
+            console.log('[Auth] Tokens encontrados, criando sessao...');
+            
+            // Definir sessao manualmente
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            
+            if (sessionError) {
+              console.error('[Auth] Erro ao definir sessao:', sessionError);
+            } else if (sessionData.session) {
+              console.log('[Auth] Sessao criada com sucesso!');
+              
+              if (mounted) {
+                setSession(sessionData.session);
+                setUser(sessionData.session.user);
+                
+                const profileData = await fetchProfile(sessionData.session.user.id);
+                setProfile(profileData);
+              }
+              
+              // Limpar hash da URL
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }
+        }
+        
+        // Buscar sessao existente
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        console.log('[Auth] Sessao existente:', !!existingSession);
+
+        if (mounted && existingSession?.user) {
+          setSession(existingSession);
+          setUser(existingSession.user);
+          
+          const profileData = await fetchProfile(existingSession.user.id);
           setProfile(profileData);
         }
       } catch (error) {
-        console.error('Erro na inicializacao:', error);
+        console.error('[Auth] Erro na inicializacao:', error);
       } finally {
         if (mounted) {
+          console.log('[Auth] Loading finalizado');
           setLoading(false);
         }
       }
@@ -96,17 +132,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listener de mudancas de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event, newSession) => {
+        console.log('[Auth] Evento:', event);
+        
         if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
 
-          if (session?.user) {
-            // Buscar perfil quando logar
-            const profileData = await fetchProfile(session.user.id);
+          if (newSession?.user) {
+            const profileData = await fetchProfile(newSession.user.id);
             setProfile(profileData);
           } else {
-            // Limpar perfil quando deslogar
             setProfile(null);
           }
 
@@ -123,10 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error };
     } catch (error) {
       return { error: error as Error };
@@ -136,16 +169,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, fullName: string, whatsapp: string) => {
     try {
       const redirectUrl = `${window.location.origin}/login`;
-
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-            whatsapp: whatsapp,
-          },
+          data: { full_name: fullName, whatsapp: whatsapp },
         },
       });
       return { error };
@@ -159,18 +188,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  const value = {
-    user,
-    session,
-    profile,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    refreshProfile,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
