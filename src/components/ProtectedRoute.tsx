@@ -1,4 +1,5 @@
-﻿// src/components/ProtectedRoute.tsx
+﻿// Atualizado: 2025-12-15 19:02:52
+// src/components/ProtectedRoute.tsx
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Crown } from 'lucide-react';
@@ -93,3 +94,4 @@ const ProtectedRoute = ({
 };
 
 export default ProtectedRoute;
+
