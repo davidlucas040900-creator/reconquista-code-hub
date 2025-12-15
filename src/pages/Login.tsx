@@ -197,20 +197,20 @@ const Login = () => {
                   </div>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <p className="text-gray-400 text-sm text-center">
-                    <strong className="text-amber-500">Ainda não é aluna?</strong>
-                    <br />
-                    
-                      href="https://codigodareconquista.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-amber-500 hover:text-amber-400 inline-flex items-center gap-1 mt-1"
-                    >
-                      Conheça o programa
-                      <ArrowRight className="w-4 h-4" />
-                    </a>
-                  </p>
+<p className="text-gray-400 text-sm text-center">
+  <strong className="text-amber-500">Ainda não é aluna?</strong>
+  <br />
+  <a
+    href="https://codigodareconquista.com"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-amber-500 hover:text-amber-400 inline-flex items-center gap-1 mt-1"
+  >
+    Conheça o programa
+    <ArrowRight className="w-4 h-4" />
+  </a>
+</p>
+
                 </div>
               </>
             )}
