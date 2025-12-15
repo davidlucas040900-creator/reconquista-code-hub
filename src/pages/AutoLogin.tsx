@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Crown, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+const SUPABASE_URL = 'https://csltrjuucicnlhipaszh.supabase.co';
+
 const AutoLogin = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ const AutoLogin = () => {
     const processAutoLogin = async () => {
       const token = searchParams.get('token');
 
-      console.log('[AutoLogin] Iniciando com token:', token?.substring(0, 20) + '...');
+      console.log('[AutoLogin] Token:', token?.substring(0, 20) + '...');
 
       if (!token) {
         setStatus('error');
@@ -25,52 +27,42 @@ const AutoLogin = () => {
 
       try {
         setMessage('Validando seu acesso...');
-        
-        // Timeout de 15 segundos
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        console.log('[AutoLogin] Chamando verify-magic-link...');
+        // Usar fetch direto para garantir que funcione
+        console.log('[AutoLogin] Chamando verify-magic-link via fetch...');
         
-        const { data, error } = await supabase.functions.invoke('verify-magic-link', {
-          body: { token }
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
         });
 
-        clearTimeout(timeoutId);
+        const data = await response.json();
+        console.log('[AutoLogin] Resposta:', data);
 
-        console.log('[AutoLogin] Resposta:', { data, error });
-
-        if (error) {
-          console.error('[AutoLogin] Erro na funcao:', error);
+        if (!data.success) {
           setStatus('error');
-          setMessage(error.message || 'Erro ao verificar o link.');
-          return;
-        }
-
-        if (!data?.success) {
-          console.log('[AutoLogin] Verificacao falhou:', data?.error);
-          setStatus('error');
-          setMessage(data?.error || 'Link expirado ou ja utilizado.');
+          setMessage(data.error || 'Link expirado ou ja utilizado.');
           return;
         }
 
         // Sucesso! Redirecionar para o action_link
         if (data.action_link) {
-          console.log('[AutoLogin] Redirecionando para action_link...');
+          console.log('[AutoLogin] Redirecionando...');
           setStatus('success');
           setMessage('Acesso confirmado! Redirecionando...');
           
-          // Pequeno delay para mostrar mensagem de sucesso
           setTimeout(() => {
             window.location.href = data.action_link;
           }, 500);
           return;
         }
 
-        // Fallback - verificar sessao existente
+        // Fallback
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData?.session) {
-          console.log('[AutoLogin] Sessao existente encontrada');
           setStatus('success');
           setMessage('Acesso confirmado! Redirecionando...');
           toast.success('Bem-vinda de volta!');
@@ -78,20 +70,13 @@ const AutoLogin = () => {
           return;
         }
 
-        // Nada funcionou
         setStatus('error');
         setMessage('Erro ao processar o acesso. Tente novamente.');
 
       } catch (error: any) {
-        console.error('[AutoLogin] Erro geral:', error);
-        
-        if (error.name === 'AbortError') {
-          setStatus('error');
-          setMessage('A verificacao demorou muito. Tente novamente.');
-        } else {
-          setStatus('error');
-          setMessage('Erro inesperado. Tente fazer login manual.');
-        }
+        console.error('[AutoLogin] Erro:', error);
+        setStatus('error');
+        setMessage('Erro inesperado. Tente novamente.');
       }
     };
 
@@ -102,7 +87,6 @@ const AutoLogin = () => {
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-8">
 
-        {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
             <Crown className="w-6 h-6 text-black" />
@@ -110,20 +94,17 @@ const AutoLogin = () => {
           <span className="text-2xl font-semibold text-white">Reconquista</span>
         </div>
 
-        {/* Status Icon */}
         <div className="relative inline-flex">
           {status === 'loading' && (
             <div className="w-20 h-20 rounded-full bg-amber-500/10 flex items-center justify-center">
               <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
             </div>
           )}
-
           {status === 'success' && (
             <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
           )}
-
           {status === 'error' && (
             <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center">
               <XCircle className="w-10 h-10 text-red-500" />
@@ -131,7 +112,6 @@ const AutoLogin = () => {
           )}
         </div>
 
-        {/* Message */}
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-white">
             {status === 'loading' && 'Processando...'}
@@ -141,7 +121,6 @@ const AutoLogin = () => {
           <p className="text-gray-400">{message}</p>
         </div>
 
-        {/* Actions */}
         {status === 'error' && (
           <div className="space-y-4 pt-4">
             <Button
@@ -150,15 +129,9 @@ const AutoLogin = () => {
             >
               Solicitar Novo Link
             </Button>
-
             <p className="text-gray-500 text-sm">
               Precisa de ajuda?{' '}
-              <a
-                href="https://wa.me/258849999999"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-amber-500 hover:underline"
-              >
+              <a href="https://wa.me/258849999999" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">
                 Fale conosco
               </a>
             </p>
