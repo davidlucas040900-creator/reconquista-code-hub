@@ -1,6 +1,4 @@
-// supabase/functions/request-access/index.ts
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -15,138 +13,160 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json()
+    const body = await req.json()
+    const email = body?.email
 
     if (!email) {
       return new Response(
-        JSON.stringify({ error: 'Email é obrigatório' }),
+        JSON.stringify({ error: 'Email e obrigatorio' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('[Request Access] Solicitacao para:', email)
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verificar se o usuário existe
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-    const existingUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    // Buscar usuario pelo email
+    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+    
+    if (usersError) {
+      console.log('[Request Access] Erro ao listar usuarios:', usersError.message)
+      throw new Error('Erro ao buscar usuarios')
+    }
+
+    const existingUser = usersData.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
 
     if (!existingUser) {
-      // Não revelar se o email existe ou não (segurança)
+      console.log('[Request Access] Usuario nao encontrado:', email)
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Se este email estiver cadastrado, você receberá um link de acesso.' 
+        JSON.stringify({
+          success: true,
+          message: 'Se este email estiver cadastrado, voce recebera um link de acesso.'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Verificar se tem acesso (comprou algum produto)
-    const { data: profile } = await supabaseAdmin
+    // Verificar se tem acesso
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('has_full_access, full_name')
       .eq('id', existingUser.id)
       .single()
 
+    if (profileError) {
+      console.log('[Request Access] Erro ao buscar perfil:', profileError.message)
+    }
+
     if (!profile?.has_full_access) {
+      console.log('[Request Access] Usuario sem acesso')
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Se este email estiver cadastrado, você receberá um link de acesso.' 
+        JSON.stringify({
+          success: true,
+          message: 'Se este email estiver cadastrado, voce recebera um link de acesso.'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Gerar novo magic link
+    // Gerar token
     const token = crypto.randomUUID() + '-' + Date.now().toString(36)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
-    await supabaseAdmin.from('magic_links').insert({
+    // Inserir magic link
+    const { error: insertError } = await supabaseAdmin.from('magic_links').insert({
       user_id: existingUser.id,
       token: token,
-      expires_at: expiresAt.toISOString(),
+      expires_at: expiresAt
     })
+
+    if (insertError) {
+      console.log('[Request Access] Erro ao inserir magic link:', insertError.message)
+      throw new Error('Erro ao gerar link de acesso')
+    }
+
+    console.log('[Request Access] Magic link criado')
 
     // Enviar email
     const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const magicLink = `${SITE_URL}/auto-login?token=${token}`
-    const firstName = profile.full_name?.split(' ')[0] || 'Aluna'
+    const firstName = profile?.full_name?.split(' ')[0] || 'Aluna'
 
     if (RESEND_API_KEY) {
-      await fetch('https://api.resend.com/emails', {
+      const emailResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Código da Reconquista <acesso@codigodareconquista.xyz>',
+          from: 'Codigo da Reconquista <acesso@codigodareconquista.xyz>',
           to: email,
-          subject: '🔐 Seu link de acesso está aqui!',
+          subject: ` ${firstName}, aqui esta seu link de acesso!`,
           html: `
-            <!DOCTYPE html>
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-              
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #18181b; margin: 0; font-size: 24px;">
-                  Olá, ${firstName}!
+            <div style="font-family:Arial;max-width:600px;margin:0 auto;padding:40px 20px;background:#0a0a0a;color:#fff;">
+              <div style="text-align:center;margin-bottom:30px;">
+                <span style="font-size:24px;font-weight:bold;color:#D4AF37;"> Reconquista</span>
+              </div>
+              <div style="background:#1a1a1a;border:1px solid #D4AF3733;border-radius:16px;padding:35px;">
+                <h1 style="color:#D4AF37;font-size:24px;margin:0 0 15px;text-align:center;">
+                  Ola, ${firstName}! 
                 </h1>
+                <p style="color:#fff;font-size:16px;line-height:1.6;text-align:center;margin:0 0 25px;">
+                  Voce solicitou acesso a sua area de membros.<br>
+                  Clique no botao abaixo para entrar:
+                </p>
+                <div style="text-align:center;margin:30px 0;">
+                  <a href="${magicLink}" 
+                     style="display:inline-block;background:linear-gradient(135deg,#D4AF37,#F4E06D);
+                            color:#000;padding:16px 40px;text-decoration:none;border-radius:10px;
+                            font-weight:bold;font-size:16px;">
+                     ACESSAR AGORA
+                  </a>
+                </div>
+                <p style="color:#666;font-size:12px;text-align:center;">
+                  Este link expira em 24 horas.
+                </p>
               </div>
-              
-              <p style="color: #52525b;">
-                Você solicitou acesso à sua área de membros. 
-                Clique no botão abaixo para entrar:
-              </p>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${magicLink}" 
-                   style="display: inline-block; background: #18181b; color: white; 
-                          padding: 14px 32px; text-decoration: none; border-radius: 8px;
-                          font-weight: 500; font-size: 16px;">
-                  Acessar Área de Membros
-                </a>
-              </div>
-
-              <p style="color: #71717a; font-size: 14px;">
-                Este link expira em 24 horas.
-              </p>
-              
-              <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 30px 0;">
-              
-              <p style="color: #a1a1aa; font-size: 12px; text-align: center;">
-                Se você não solicitou este acesso, ignore este email.
-              </p>
-              
-            </body>
-            </html>
+            </div>
           `
         })
       })
 
-      // Log de acesso
+      if (emailResponse.ok) {
+        console.log('[Request Access] Email enviado com sucesso!')
+      } else {
+        const errorText = await emailResponse.text()
+        console.log('[Request Access] Erro ao enviar email:', errorText)
+      }
+    }
+
+    // Log de acesso (sem .catch)
+    try {
       await supabaseAdmin.from('access_logs').insert({
         user_id: existingUser.id,
         action: 'request_access',
         metadata: { email, token_generated: true }
       })
+    } catch (logError) {
+      console.log('[Request Access] Erro no log (ignorado):', logError)
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Link de acesso enviado para seu email!' 
+      JSON.stringify({
+        success: true,
+        message: 'Link de acesso enviado para seu email!'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Erro:', error)
+    console.log('[Request Access] Erro:', error.message)
     return new Response(
       JSON.stringify({ error: 'Erro interno do servidor' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
