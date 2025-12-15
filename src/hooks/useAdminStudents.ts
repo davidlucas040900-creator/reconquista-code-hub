@@ -1,168 +1,281 @@
-﻿// src/hooks/useAdminStudents.ts
+// src/hooks/useAdminStudents.ts
+// VERSÃO ACTUALIZADA - Usa funções RPC do Supabase
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAdminActions } from './useAdminActions';
+
+interface Student {
+  id: string;
+  email: string;
+  full_name: string | null;
+  whatsapp: string | null;
+  role: string;
+  has_full_access: boolean;
+  purchase_date: string | null;
+  created_at: string;
+  total_purchases: number;
+  courses_count: number;
+}
+
+interface UserDetails {
+  profile: any;
+  purchases: any[];
+  course_access: any[];
+  magic_links: any[];
+  access_logs: any[];
+}
+
+interface MagicLinkResult {
+  success: boolean;
+  token?: string;
+  magic_link?: string;
+  expires_at?: string;
+  email?: string;
+  message: string;
+}
 
 export function useAdminStudents() {
   const queryClient = useQueryClient();
-  const { logAction } = useAdminActions();
 
-  // Listar todos os alunos
-  const { data: students, isLoading } = useQuery({
+  // ========================================
+  // LISTAR UTILIZADORES (usa RPC)
+  // ========================================
+  const { data: students, isLoading, refetch } = useQuery({
     queryKey: ['admin-students'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.rpc('admin_list_users', {
+        p_limit: 500,
+        p_offset: 0
+      });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro admin_list_users:', error);
+        throw error;
+      }
+      
+      return data as Student[];
     },
   });
 
-  // Bloquear/Desbloquear aluno
+  // ========================================
+  // PESQUISAR UTILIZADORES
+  // ========================================
+  const searchUsers = async (search: string): Promise<Student[]> => {
+    const { data, error } = await supabase.rpc('admin_list_users', {
+      p_search: search,
+      p_limit: 50,
+      p_offset: 0
+    });
+
+    if (error) throw error;
+    return data as Student[];
+  };
+
+  // ========================================
+  // DETALHES DO UTILIZADOR
+  // ========================================
+  const getUserDetails = async (userId: string): Promise<UserDetails | null> => {
+    const { data, error } = await supabase.rpc('admin_get_user_details', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      console.error('Erro admin_get_user_details:', error);
+      return null;
+    }
+    
+    return data as UserDetails;
+  };
+
+  // ========================================
+  // BLOQUEAR/DESBLOQUEAR ACESSO
+  // ========================================
   const toggleAccessMutation = useMutation({
     mutationFn: async ({ userId, hasAccess }: { userId: string; hasAccess: boolean }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ has_full_access: !hasAccess })
-        .eq('id', userId);
+      const { data, error } = await supabase.rpc('admin_update_user', {
+        p_user_id: userId,
+        p_has_full_access: !hasAccess
+      });
 
       if (error) throw error;
-
-      await logAction(
-        hasAccess ? 'block_student' : 'unblock_student',
-        'user',
-        userId
-      );
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-students'] });
       toast.success('Acesso atualizado com sucesso!');
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Erro ao atualizar acesso:', error);
       toast.error('Erro ao atualizar acesso');
     },
   });
 
-  // Trocar senha do aluno
-  const resetPasswordMutation = useMutation({
-    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-      const { error } = await supabase.auth.admin.updateUserById(userId, {
-        password: newPassword,
+  // ========================================
+  // GERAR MAGIC LINK (NOVO!)
+  // ========================================
+  const generateMagicLinkMutation = useMutation({
+    mutationFn: async ({ userId, expiryDays = 7 }: { userId: string; expiryDays?: number }): Promise<MagicLinkResult> => {
+      const { data, error } = await supabase.rpc('admin_generate_magic_link', {
+        p_user_id: userId,
+        p_expiry_days: expiryDays
       });
 
       if (error) throw error;
-
-      await logAction('reset_password', 'user', userId);
+      return data as MagicLinkResult;
     },
-    onSuccess: () => {
-      toast.success('Senha alterada com sucesso!');
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Magic link gerado com sucesso!');
+      } else {
+        toast.error(data.message || 'Erro ao gerar link');
+      }
     },
-    onError: () => {
-      toast.error('Erro ao alterar senha');
+    onError: (error) => {
+      console.error('Erro ao gerar magic link:', error);
+      toast.error('Erro ao gerar magic link');
     },
   });
 
-  // Dar acesso a curso específico
+  // ========================================
+  // DAR ACESSO A CURSO
+  // ========================================
   const grantCourseAccessMutation = useMutation({
     mutationFn: async ({ userId, courseId }: { userId: string; courseId: string }) => {
-      const { error } = await supabase
-        .from('user_course_access')
-        .insert({ user_id: userId, course_id: courseId });
+      const { data, error } = await supabase.rpc('admin_grant_course_access', {
+        p_user_id: userId,
+        p_course_id: courseId
+      });
 
       if (error) throw error;
-
-      await logAction('grant_course_access', 'user', userId, { courseId });
+      return data;
     },
-    onSuccess: () => {
-      toast.success('Acesso ao curso concedido!');
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-students'] });
+      toast.success(data?.message || 'Acesso ao curso concedido!');
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Erro ao conceder acesso:', error);
       toast.error('Erro ao conceder acesso');
     },
   });
 
-  // Remover acesso a curso
+  // ========================================
+  // REVOGAR ACESSO A CURSO
+  // ========================================
   const revokeCourseAccessMutation = useMutation({
     mutationFn: async ({ userId, courseId }: { userId: string; courseId: string }) => {
-      const { error } = await supabase
-        .from('user_course_access')
-        .delete()
-        .eq('user_id', userId)
-        .eq('course_id', courseId);
+      const { data, error } = await supabase.rpc('admin_revoke_course_access', {
+        p_user_id: userId,
+        p_course_id: courseId
+      });
 
       if (error) throw error;
-
-      await logAction('revoke_course_access', 'user', userId, { courseId });
+      return data;
     },
-    onSuccess: () => {
-      toast.success('Acesso ao curso removido!');
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-students'] });
+      toast.success(data?.message || 'Acesso ao curso removido!');
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Erro ao remover acesso:', error);
       toast.error('Erro ao remover acesso');
     },
   });
 
-  // Bloquear módulo específico para um aluno
-  const blockModuleMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      moduleId,
-      reason,
-    }: {
-      userId: string;
-      moduleId: string;
-      reason?: string;
+  // ========================================
+  // CRIAR COMPRA MANUAL
+  // ========================================
+  const createPurchaseMutation = useMutation({
+    mutationFn: async ({ 
+      userId, 
+      productId, 
+      amount = 0, 
+      notes 
+    }: { 
+      userId: string; 
+      productId: string; 
+      amount?: number;
+      notes?: string;
     }) => {
-      const { error } = await supabase
-        .from('user_module_blocks')
-        .insert({ user_id: userId, module_id: moduleId, reason });
+      const { data, error } = await supabase.rpc('admin_create_purchase', {
+        p_user_id: userId,
+        p_product_id: productId,
+        p_amount: amount,
+        p_notes: notes
+      });
 
       if (error) throw error;
-
-      await logAction('block_module', 'user', userId, { moduleId, reason });
+      return data;
     },
-    onSuccess: () => {
-      toast.success('Módulo bloqueado!');
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-students'] });
+      toast.success(data?.message || 'Compra criada com sucesso!');
     },
-    onError: () => {
-      toast.error('Erro ao bloquear módulo');
+    onError: (error) => {
+      console.error('Erro ao criar compra:', error);
+      toast.error('Erro ao criar compra');
     },
   });
 
-  // Desbloquear módulo
-  const unblockModuleMutation = useMutation({
-    mutationFn: async ({ userId, moduleId }: { userId: string; moduleId: string }) => {
-      const { error } = await supabase
-        .from('user_module_blocks')
-        .delete()
-        .eq('user_id', userId)
-        .eq('module_id', moduleId);
+  // ========================================
+  // ATUALIZAR UTILIZADOR
+  // ========================================
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ 
+      userId, 
+      fullName, 
+      whatsapp, 
+      role 
+    }: { 
+      userId: string; 
+      fullName?: string;
+      whatsapp?: string;
+      role?: string;
+    }) => {
+      const { data, error } = await supabase.rpc('admin_update_user', {
+        p_user_id: userId,
+        p_full_name: fullName,
+        p_whatsapp: whatsapp,
+        p_role: role
+      });
 
       if (error) throw error;
-
-      await logAction('unblock_module', 'user', userId, { moduleId });
+      return data;
     },
     onSuccess: () => {
-      toast.success('Módulo desbloqueado!');
+      queryClient.invalidateQueries({ queryKey: ['admin-students'] });
+      toast.success('Utilizador atualizado!');
     },
-    onError: () => {
-      toast.error('Erro ao desbloquear módulo');
+    onError: (error) => {
+      console.error('Erro ao atualizar utilizador:', error);
+      toast.error('Erro ao atualizar utilizador');
     },
   });
 
   return {
+    // Dados
     students,
     isLoading,
+    
+    // Funções de busca
+    refetch,
+    searchUsers,
+    getUserDetails,
+    
+    // Mutations
     toggleAccess: toggleAccessMutation.mutate,
-    resetPassword: resetPasswordMutation.mutate,
+    toggleAccessAsync: toggleAccessMutation.mutateAsync,
+    
+    generateMagicLink: generateMagicLinkMutation.mutate,
+    generateMagicLinkAsync: generateMagicLinkMutation.mutateAsync,
+    isGeneratingMagicLink: generateMagicLinkMutation.isPending,
+    
     grantCourseAccess: grantCourseAccessMutation.mutate,
     revokeCourseAccess: revokeCourseAccessMutation.mutate,
-    blockModule: blockModuleMutation.mutate,
-    unblockModule: unblockModuleMutation.mutate,
+    
+    createPurchase: createPurchaseMutation.mutate,
+    
+    updateUser: updateUserMutation.mutate,
   };
 }
