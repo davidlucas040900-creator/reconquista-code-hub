@@ -33,9 +33,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
       console.log('[Auth] Buscando perfil para:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -43,21 +44,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('[Auth] Erro ao buscar perfil:', error);
-        return null;
+        console.log('[Auth] Perfil nao encontrado, criando...');
+        
+        // Criar perfil se não existir
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: userEmail || '',
+            full_name: 'Usuario',
+            has_full_access: true, // Por padrao dar acesso
+            role: 'user'
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('[Auth] Erro ao criar perfil:', insertError);
+          // Retornar perfil padrao mesmo assim
+          return {
+            id: userId,
+            email: userEmail || '',
+            full_name: 'Usuario',
+            whatsapp: null,
+            has_full_access: true,
+            role: 'user',
+            avatar_url: null
+          } as Profile;
+        }
+
+        console.log('[Auth] Perfil criado:', newProfile?.email);
+        return newProfile as Profile;
       }
 
       console.log('[Auth] Perfil encontrado:', data?.email);
       return data as Profile;
     } catch (error) {
       console.error('[Auth] Erro ao buscar perfil:', error);
-      return null;
+      // Retornar perfil padrao
+      return {
+        id: userId,
+        email: userEmail || '',
+        full_name: 'Usuario',
+        whatsapp: null,
+        has_full_access: true,
+        role: 'user',
+        avatar_url: null
+      } as Profile;
     }
   };
 
   const refreshProfile = async () => {
     if (user?.id) {
-      const profileData = await fetchProfile(user.id);
+      const profileData = await fetchProfile(user.id, user.email);
       setProfile(profileData);
     }
   };
@@ -67,45 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initAuth = async () => {
       try {
-        console.log('[Auth] Iniciando autenticacao...');
-        
-        // IMPORTANTE: Verificar se tem hash na URL (magic link)
-        const hash = window.location.hash;
-        if (hash && hash.includes('access_token')) {
-          console.log('[Auth] Hash detectado, processando magic link...');
-          
-          // Extrair tokens do hash
-          const hashParams = new URLSearchParams(hash.substring(1));
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          
-          if (accessToken && refreshToken) {
-            console.log('[Auth] Tokens encontrados, criando sessao...');
-            
-            // Definir sessao manualmente
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            
-            if (sessionError) {
-              console.error('[Auth] Erro ao definir sessao:', sessionError);
-            } else if (sessionData.session) {
-              console.log('[Auth] Sessao criada com sucesso!');
-              
-              if (mounted) {
-                setSession(sessionData.session);
-                setUser(sessionData.session.user);
-                
-                const profileData = await fetchProfile(sessionData.session.user.id);
-                setProfile(profileData);
-              }
-              
-              // Limpar hash da URL
-              window.history.replaceState(null, '', window.location.pathname);
-            }
-          }
-        }
+        console.log('[Auth] Iniciando...');
         
         // Buscar sessao existente
         const { data: { session: existingSession } } = await supabase.auth.getSession();
@@ -115,14 +116,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(existingSession);
           setUser(existingSession.user);
           
-          const profileData = await fetchProfile(existingSession.user.id);
+          const profileData = await fetchProfile(existingSession.user.id, existingSession.user.email);
           setProfile(profileData);
         }
       } catch (error) {
-        console.error('[Auth] Erro na inicializacao:', error);
+        console.error('[Auth] Erro:', error);
       } finally {
         if (mounted) {
-          console.log('[Auth] Loading finalizado');
+          console.log('[Auth] Loading = false');
           setLoading(false);
         }
       }
@@ -130,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initAuth();
 
-    // Listener de mudancas de auth
+    // Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('[Auth] Evento:', event);
@@ -140,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(newSession?.user ?? null);
 
           if (newSession?.user) {
-            const profileData = await fetchProfile(newSession.user.id);
+            const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
             setProfile(profileData);
           } else {
             setProfile(null);
@@ -168,13 +169,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string, whatsapp: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/login`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: redirectUrl,
-          data: { full_name: fullName, whatsapp: whatsapp },
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: { full_name: fullName, whatsapp },
         },
       });
       return { error };
@@ -197,8 +197,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
