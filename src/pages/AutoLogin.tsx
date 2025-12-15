@@ -17,6 +17,32 @@ const AutoLogin = () => {
     const processAutoLogin = async () => {
       const token = searchParams.get('token');
 
+      // Se ja tem hash na URL (retorno do Supabase), processar sessao
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('[AutoLogin] Processando hash do Supabase...');
+        setMessage('Finalizando login...');
+        
+        // O Supabase vai processar automaticamente
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session) {
+          console.log('[AutoLogin] Sessao ativa!');
+          setStatus('success');
+          setMessage('Bem-vinda! Redirecionando...');
+          toast.success('Login realizado com sucesso!');
+          
+          // Limpar hash e redirecionar
+          window.history.replaceState(null, '', '/dashboard');
+          setTimeout(() => navigate('/dashboard'), 500);
+          return;
+        }
+        
+        if (error) {
+          console.log('[AutoLogin] Erro na sessao:', error.message);
+        }
+      }
+
       console.log('[AutoLogin] Token:', token?.substring(0, 20) + '...');
 
       if (!token) {
@@ -28,14 +54,9 @@ const AutoLogin = () => {
       try {
         setMessage('Validando seu acesso...');
 
-        // Usar fetch direto para garantir que funcione
-        console.log('[AutoLogin] Chamando verify-magic-link via fetch...');
-        
         const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         });
 
@@ -48,19 +69,18 @@ const AutoLogin = () => {
           return;
         }
 
-        // Sucesso! Redirecionar para o action_link
+        // Se temos action_link, redirecionar IMEDIATAMENTE
         if (data.action_link) {
-          console.log('[AutoLogin] Redirecionando...');
+          console.log('[AutoLogin] Redirecionando para action_link...');
           setStatus('success');
           setMessage('Acesso confirmado! Redirecionando...');
           
-          setTimeout(() => {
-            window.location.href = data.action_link;
-          }, 500);
+          // Redirecionar imediatamente sem delay
+          window.location.href = data.action_link;
           return;
         }
 
-        // Fallback
+        // Fallback: verificar sessao existente
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData?.session) {
           setStatus('success');
@@ -71,7 +91,7 @@ const AutoLogin = () => {
         }
 
         setStatus('error');
-        setMessage('Erro ao processar o acesso. Tente novamente.');
+        setMessage('Erro ao processar o acesso. Solicite um novo link.');
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);
