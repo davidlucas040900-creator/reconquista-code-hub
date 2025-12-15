@@ -12,11 +12,13 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const startTime = Date.now()
+
   try {
     const body = await req.json()
     const token = body?.token
 
-    console.log('[Verify] Token recebido')
+    console.log('[Verify] Iniciando...')
 
     if (!token) {
       return new Response(
@@ -30,81 +32,100 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar magic link
+    // 1. Buscar magic link (query optimizada - sem SELECT *)
     const { data: magicLink, error: linkError } = await supabaseAdmin
       .from('magic_links')
-      .select('*')
+      .select('user_id, expires_at, used_at')
       .eq('token', token)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
       .single()
 
     if (linkError || !magicLink) {
-      console.log('[Verify] Token invalido ou expirado')
+      console.log('[Verify] Token nao encontrado')
       return new Response(
-        JSON.stringify({ success: false, error: 'Link invalido, expirado ou ja utilizado.' }),
+        JSON.stringify({ success: false, error: 'Link invalido ou nao encontrado.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Verify] Magic link valido, user:', magicLink.user_id)
-
-    // Buscar usuario
-    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
-    if (!userData?.user?.email) {
+    // 2. Validar usado
+    if (magicLink.used_at) {
+      console.log('[Verify] Token ja usado')
       return new Response(
-        JSON.stringify({ success: false, error: 'Usuario nao encontrado' }),
+        JSON.stringify({ success: false, error: 'Este link ja foi utilizado. Solicite um novo.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Verify] Usuario encontrado:', userData.user.email)
+    // 3. Validar expiracao
+    if (new Date(magicLink.expires_at) < new Date()) {
+      console.log('[Verify] Token expirado')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Link expirado. Solicite um novo.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Criar sessao usando senha temporaria
-    const tempPassword = 'TempMagicLink_' + Date.now() + '_' + Math.random().toString(36)
+    console.log('[Verify] Token valido, user:', magicLink.user_id)
+
+    // 4. Marcar como usado ANTES (previne uso duplicado em requests paralelos)
+    await supabaseAdmin
+      .from('magic_links')
+      .update({ used_at: new Date().toISOString() })
+      .eq('token', token)
+
+    // 5. Buscar usuario
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
     
-    // Atualizar senha temporariamente
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(magicLink.user_id, {
-      password: tempPassword
-    })
+    if (userError || !userData?.user?.email) {
+      console.log('[Verify] Usuario nao encontrado')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Usuario nao encontrado.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('[Verify] Usuario:', userData.user.email)
+
+    // 6. Criar sessao (metodo optimizado com UUID mais curto)
+    const tempPass = crypto.randomUUID().split('-')[0] + Date.now().toString(36)
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      magicLink.user_id, 
+      { password: tempPass }
+    )
 
     if (updateError) {
-      console.log('[Verify] Erro ao atualizar senha:', updateError.message)
+      console.log('[Verify] Erro update:', updateError.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao preparar sessao' }),
+        JSON.stringify({ success: false, error: 'Erro ao preparar sessao.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Fazer login com a senha temporaria
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email: userData.user.email,
-      password: tempPassword
+      password: tempPass
     })
 
     if (signInError || !signInData.session) {
-      console.log('[Verify] Erro no signIn:', signInError?.message)
+      console.log('[Verify] Erro signIn:', signInError?.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao criar sessao' }),
+        JSON.stringify({ success: false, error: 'Erro ao criar sessao.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Verify] Sessao criada com sucesso!')
+    // 7. Log async (nao bloqueia resposta)
+    supabaseAdmin.from('access_logs').insert({
+      user_id: magicLink.user_id,
+      action: 'magic_link_login',
+      metadata: { elapsed_ms: Date.now() - startTime }
+    }).then(() => {}).catch(() => {})
 
-    // Marcar token como usado
-    await supabaseAdmin.from('magic_links').update({ used_at: new Date().toISOString() }).eq('token', token)
+    const elapsed = Date.now() - startTime
+    console.log(`[Verify] Sucesso em ${elapsed}ms`)
 
-    // Log
-    try {
-      await supabaseAdmin.from('access_logs').insert({
-        user_id: magicLink.user_id,
-        action: 'magic_link_login',
-        metadata: { product_name: magicLink.product_name }
-      })
-    } catch (e) {}
-
-    // Retornar tokens da sessao
+    // 8. Retornar (mesmo formato que AutoLogin.tsx espera)
     return new Response(
       JSON.stringify({
         success: true,
@@ -119,9 +140,9 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.log('[Verify] Erro geral:', error.message)
+    console.log('[Verify] Erro:', error.message)
     return new Response(
-      JSON.stringify({ success: false, error: 'Erro interno' }),
+      JSON.stringify({ success: false, error: 'Erro interno.' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
