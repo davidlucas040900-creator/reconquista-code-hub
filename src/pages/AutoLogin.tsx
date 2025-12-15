@@ -16,7 +16,6 @@ const AutoLogin = () => {
       const token = searchParams.get('token');
 
       console.log('=== AUTO LOGIN INICIADO ===');
-      console.log('Token recebido:', token);
 
       if (!token) {
         setStatus('error');
@@ -25,107 +24,54 @@ const AutoLogin = () => {
       }
 
       try {
-        // 1. Buscar token na tabela magic_links (SEM RLS - usando select direto)
-        console.log('Buscando token na tabela magic_links...');
+        // 1. Chamar Edge Function para verificar token e obter action_link
+        console.log('Verificando token via Edge Function...');
         
-        const { data: magicLink, error: linkError } = await supabase
-          .from('magic_links')
-          .select('*')
-          .eq('token', token)
-          .maybeSingle();
-
-        console.log('Resultado da busca:', { magicLink, linkError });
-
-        if (linkError) {
-          console.error('Erro ao buscar token:', linkError);
-          setStatus('error');
-          setMessage('Erro ao verificar o link. Tente novamente.');
-          return;
-        }
-
-        if (!magicLink) {
-          console.log('Token nao encontrado na tabela');
-          setStatus('error');
-          setMessage('Link nao encontrado. Solicite um novo acesso.');
-          return;
-        }
-
-        // 2. Verificar se ja foi usado
-        if (magicLink.used_at) {
-          console.log('Token ja foi usado em:', magicLink.used_at);
-          setStatus('error');
-          setMessage('Este link ja foi utilizado. Solicite um novo.');
-          return;
-        }
-
-        // 3. Verificar se expirou
-        const expiresAt = new Date(magicLink.expires_at);
-        const now = new Date();
-        console.log('Expira em:', expiresAt, 'Agora:', now);
-        
-        if (expiresAt < now) {
-          console.log('Token expirado');
-          setStatus('error');
-          setMessage('Este link expirou. Solicite um novo.');
-          return;
-        }
-
-        // 4. Buscar email do usuario
-        console.log('Buscando perfil do usuario:', magicLink.user_id);
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('email, full_name')
-          .eq('id', magicLink.user_id)
-          .maybeSingle();
-
-        console.log('Perfil encontrado:', { profile, profileError });
-
-        if (profileError || !profile?.email) {
-          console.error('Usuario nao encontrado');
-          setStatus('error');
-          setMessage('Usuario nao encontrado. Entre em contato com o suporte.');
-          return;
-        }
-
-        // 5. Fazer login com senha padrao
-        console.log('Tentando login com:', profile.email);
-        
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: profile.email,
-          password: 'Reconquista@2026',
+        const { data, error } = await supabase.functions.invoke('verify-magic-link', {
+          body: { token }
         });
 
-        console.log('Resultado do login:', { signInData, signInError });
+        console.log('Resposta da Edge Function:', { data, error });
 
-        if (signInError) {
-          console.error('Erro no login com senha:', signInError);
+        if (error) {
+          console.error('Erro na Edge Function:', error);
           setStatus('error');
-          setMessage('Erro ao fazer login. Use o login manual com sua senha.');
+          setMessage(error.message || 'Erro ao verificar o link.');
           return;
         }
 
-        // 6. Marcar token como usado
-        console.log('Marcando token como usado...');
-        
-        const { error: updateError } = await supabase
-          .from('magic_links')
-          .update({ used_at: new Date().toISOString() })
-          .eq('token', token);
-
-        if (updateError) {
-          console.warn('Aviso: Nao foi possivel marcar token como usado:', updateError);
+        if (!data?.success) {
+          setStatus('error');
+          setMessage(data?.error || 'Link expirado ou ja utilizado.');
+          return;
         }
 
-        // 7. Sucesso!
-        console.log('=== LOGIN REALIZADO COM SUCESSO ===');
-        setStatus('success');
-        setMessage('Acesso confirmado! Redirecionando...');
-        
-        const firstName = profile.full_name?.split(' ')[0] || '';
-        toast.success(`Bem-vinda${firstName ? ', ' + firstName : ''}!`);
+        // 2. Se temos action_link, redirecionar para ele
+        if (data.action_link) {
+          console.log('Redirecionando para action_link do Supabase...');
+          setStatus('success');
+          setMessage('Acesso confirmado! Redirecionando...');
+          
+          // O action_link do Supabase vai autenticar automaticamente
+          window.location.href = data.action_link;
+          return;
+        }
 
-        setTimeout(() => navigate('/dashboard'), 1500);
+        // 3. Fallback - verificar se ja esta logado
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (sessionData?.session) {
+          console.log('Sessao ja existe, redirecionando...');
+          setStatus('success');
+          setMessage('Acesso confirmado! Redirecionando...');
+          toast.success('Bem-vinda de volta!');
+          setTimeout(() => navigate('/dashboard'), 1000);
+          return;
+        }
+
+        // 4. Se nada funcionou
+        setStatus('error');
+        setMessage('Erro ao processar o acesso. Tente novamente.');
 
       } catch (error: any) {
         console.error('Erro geral no auto-login:', error);
@@ -140,7 +86,7 @@ const AutoLogin = () => {
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-8">
-        
+
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
@@ -156,13 +102,13 @@ const AutoLogin = () => {
               <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
             </div>
           )}
-          
+
           {status === 'success' && (
             <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
           )}
-          
+
           {status === 'error' && (
             <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center">
               <XCircle className="w-10 h-10 text-red-500" />
@@ -189,7 +135,7 @@ const AutoLogin = () => {
             >
               Ir para Login
             </Button>
-            
+
             <p className="text-gray-500 text-sm">
               Precisa de ajuda?{' '}
               <a
