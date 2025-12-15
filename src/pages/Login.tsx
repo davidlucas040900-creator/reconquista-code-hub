@@ -64,9 +64,9 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-noir-950 relative overflow-hidden">
-      {/* Background Pattern - Igual ao Dashboard */}
+      {/* Background Pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMiI+PHBhdGggZD0iTTM2IDM0djItaDJ2LTJoLTJ6bTAtNHYyaDJ2LTJoLTJ6bTAtNHYyaDJ2LTJoLTJ6bTAtNHYyaDJ2LTJoLTJ6bTAtNHYyaDJ2LTJoLTJ6bTItMTZ2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yem0wIDR2Mmgydi0yaC0yeiIvPjwvZz48L2c+PC9zdmc+')] opacity-20" />
-      
+
       {/* Gradient Overlays */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-gold/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -90,9 +90,9 @@ const Login = () => {
             </p>
           </div>
 
-          {/* Card Principal - Glassmorphism */}
+          {/* Card Principal */}
           <div className="bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
-            
+
             {/* MODO: ESCOLHER */}
             {mode === 'choose' && (
               <div className="space-y-4">
@@ -109,7 +109,7 @@ const Login = () => {
                         Login com Senha
                       </h3>
                       <p className="text-sm text-gray-400">
-                        Já tenho cadastro
+                        Ja tenho cadastro
                       </p>
                     </div>
                     <ArrowRight className="w-5 h-5 text-gold group-hover:translate-x-1 transition-transform" />
@@ -141,11 +141,8 @@ const Login = () => {
             {/* MODO: LOGIN COM SENHA */}
             {mode === 'email-login' && (
               <form onSubmit={handleSignIn} className="space-y-6">
-                {/* Email */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">
-                    Email
-                  </label>
+                  <label className="text-sm font-medium text-gray-300">Email</label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold" />
                     <Input
@@ -160,11 +157,8 @@ const Login = () => {
                   </div>
                 </div>
 
-                {/* Senha */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">
-                    Senha
-                  </label>
+                  <label className="text-sm font-medium text-gray-300">Senha</label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold" />
                     <Input
@@ -186,7 +180,6 @@ const Login = () => {
                   </div>
                 </div>
 
-                {/* Botões */}
                 <div className="space-y-3">
                   <Button
                     type="submit"
@@ -219,9 +212,7 @@ const Login = () => {
             {mode === 'request-access' && (
               <form onSubmit={handleRequestAccess} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">
-                    Email
-                  </label>
+                  <label className="text-sm font-medium text-gray-300">Email</label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold" />
                     <Input
@@ -235,7 +226,7 @@ const Login = () => {
                     />
                   </div>
                   <p className="text-xs text-gray-500">
-                    Enviaremos um link mágico para seu email
+                    Enviaremos um link magico para seu email
                   </p>
                 </div>
 
@@ -290,7 +281,7 @@ const Login = () => {
                   variant="outline"
                   className="w-full border-white/10 text-white hover:bg-white/5"
                 >
-                  Voltar ao início
+                  Voltar ao inicio
                 </Button>
               </div>
             )}
@@ -299,7 +290,7 @@ const Login = () => {
           {/* Footer */}
           <p className="text-center text-gray-500 text-sm mt-6">
             Precisa de ajuda?{' '}
-            
+            <a
               href="https://wa.me/258849999999"
               target="_blank"
               rel="noopener noreferrer"
