@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,8 +32,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // REF para evitar chamadas duplicadas
+  const fetchingProfile = useRef(false);
+  const lastFetchedUserId = useRef<string | null>(null);
 
-  const fetchProfile = async (userId: string, userEmail?: string) => {
+  const fetchProfile = async (userId: string, userEmail?: string): Promise<Profile | null> => {
+    // Evitar chamadas duplicadas para o mesmo utilizador
+    if (fetchingProfile.current && lastFetchedUserId.current === userId) {
+      console.log('[Auth] Ja buscando perfil, ignorando...');
+      return null;
+    }
+
+    fetchingProfile.current = true;
+    lastFetchedUserId.current = userId;
+
     try {
       console.log('[Auth] Buscando perfil para:', userId);
       
@@ -45,15 +58,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.log('[Auth] Perfil nao encontrado, criando...');
-        
-        // Criar perfil se não existir
+
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: userId,
             email: userEmail || '',
             full_name: 'Usuario',
-            has_full_access: true, // Por padrao dar acesso
+            has_full_access: true,
             role: 'user'
           })
           .select()
@@ -61,8 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (insertError) {
           console.error('[Auth] Erro ao criar perfil:', insertError);
-          // Retornar perfil padrao mesmo assim
-          return {
+          const defaultProfile = {
             id: userId,
             email: userEmail || '',
             full_name: 'Usuario',
@@ -71,17 +82,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: 'user',
             avatar_url: null
           } as Profile;
+          
+          fetchingProfile.current = false;
+          return defaultProfile;
         }
 
         console.log('[Auth] Perfil criado:', newProfile?.email);
+        fetchingProfile.current = false;
         return newProfile as Profile;
       }
 
       console.log('[Auth] Perfil encontrado:', data?.email);
+      fetchingProfile.current = false;
       return data as Profile;
     } catch (error) {
       console.error('[Auth] Erro ao buscar perfil:', error);
-      // Retornar perfil padrao
+      fetchingProfile.current = false;
       return {
         id: userId,
         email: userEmail || '',
@@ -95,9 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const refreshProfile = async () => {
-    if (user?.id) {
+    if (user?.id && !fetchingProfile.current) {
       const profileData = await fetchProfile(user.id, user.email);
-      setProfile(profileData);
+      if (profileData) {
+        setProfile(profileData);
+      }
     }
   };
 
@@ -107,17 +125,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initAuth = async () => {
       try {
         console.log('[Auth] Iniciando...');
-        
-        // Buscar sessao existente
+
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         console.log('[Auth] Sessao existente:', !!existingSession);
 
         if (mounted && existingSession?.user) {
           setSession(existingSession);
           setUser(existingSession.user);
-          
+
           const profileData = await fetchProfile(existingSession.user.id, existingSession.user.email);
-          setProfile(profileData);
+          if (profileData) {
+            setProfile(profileData);
+          }
         }
       } catch (error) {
         console.error('[Auth] Erro:', error);
@@ -131,24 +150,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initAuth();
 
-    // Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('[Auth] Evento:', event);
-        
-        if (mounted) {
+
+        if (!mounted) return;
+
+        // IGNORAR eventos que nao mudam o utilizador
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('[Auth] Token refreshed - ignorando fetch de perfil');
           setSession(newSession);
-          setUser(newSession?.user ?? null);
-
-          if (newSession?.user) {
-            const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
-            setProfile(profileData);
-          } else {
-            setProfile(null);
-          }
-
-          setLoading(false);
+          return;
         }
+
+        // IGNORAR se e o mesmo utilizador e ja temos perfil
+        if (event === 'SIGNED_IN' && newSession?.user?.id === lastFetchedUserId.current && profile) {
+          console.log('[Auth] Mesmo utilizador, ja tem perfil - ignorando');
+          setSession(newSession);
+          setUser(newSession.user);
+          return;
+        }
+
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (newSession?.user) {
+          // So buscar perfil se mudou o utilizador ou nao temos perfil
+          if (newSession.user.id !== lastFetchedUserId.current || !profile) {
+            const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
+            if (profileData && mounted) {
+              setProfile(profileData);
+            }
+          }
+        } else {
+          setProfile(null);
+          lastFetchedUserId.current = null;
+        }
+
+        setLoading(false);
       }
     );
 
@@ -185,6 +224,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     setProfile(null);
+    lastFetchedUserId.current = null;
+    fetchingProfile.current = false;
     await supabase.auth.signOut();
   };
 
