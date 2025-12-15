@@ -21,7 +21,7 @@ serve(async (req) => {
     if (!token) {
       return new Response(
         JSON.stringify({ success: false, error: 'Token obrigatorio' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -29,10 +29,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
-      console.log('[Verify] ERRO: Variaveis de ambiente nao configuradas')
+      console.log('[Verify] ERRO: Variaveis nao configuradas')
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro de configuracao do servidor' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'Erro de configuracao' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -48,7 +48,7 @@ serve(async (req) => {
       .single()
 
     if (linkError || !magicLink) {
-      console.log('[Verify] Token invalido ou expirado:', linkError?.message)
+      console.log('[Verify] Token invalido:', linkError?.message)
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -58,85 +58,74 @@ serve(async (req) => {
       )
     }
 
-    console.log('[Verify] Magic link valido para user:', magicLink.user_id)
+    console.log('[Verify] Magic link valido, user_id:', magicLink.user_id)
 
-    // Buscar email do usuario
+    // Buscar usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(
       magicLink.user_id
     )
 
     if (userError || !userData?.user?.email) {
-      console.log('[Verify] Usuario nao encontrado:', userError?.message)
+      console.log('[Verify] Usuario nao encontrado')
       return new Response(
         JSON.stringify({ success: false, error: 'Usuario nao encontrado' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const userEmail = userData.user.email
-    console.log('[Verify] Email do usuario:', userEmail)
+    console.log('[Verify] Usuario:', userData.user.email)
 
-    // Gerar action link do Supabase
+    // Gerar action link
     const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
     
     const { data: linkData, error: genError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: userEmail,
+      email: userData.user.email,
       options: {
         redirectTo: `${SITE_URL}/dashboard`
       }
     })
 
     if (genError || !linkData?.properties?.action_link) {
-      console.log('[Verify] Erro ao gerar sessao:', genError?.message)
+      console.log('[Verify] Erro ao gerar link:', genError?.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao gerar sessao de acesso' }),
+        JSON.stringify({ success: false, error: 'Erro ao gerar sessao' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Verify] Action link gerado com sucesso!')
+    console.log('[Verify] Action link gerado!')
 
     // Marcar token como usado
-    const { error: updateError } = await supabaseAdmin
+    await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
       .eq('token', token)
 
-    if (updateError) {
-      console.log('[Verify] Erro ao marcar token como usado:', updateError.message)
-    }
-
-    // Log de acesso
+    // Log
     try {
       await supabaseAdmin.from('access_logs').insert({
         user_id: magicLink.user_id,
         action: 'magic_link_login',
-        metadata: { 
-          product_name: magicLink.product_name || 'N/A',
-          token_used: true 
-        }
+        metadata: { product_name: magicLink.product_name }
       })
-    } catch (logErr) {
-      console.log('[Verify] Erro no log (ignorado)')
-    }
+    } catch (e) {}
 
-    console.log('[Verify] Sucesso! Retornando action_link')
+    console.log('[Verify] Sucesso!')
 
     return new Response(
       JSON.stringify({
         success: true,
         action_link: linkData.properties.action_link,
-        user_id: magicLink.user_id,
-        product_name: magicLink.product_name
+        user_id: magicLink.user_id
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.log('[Verify] Erro geral:', error.message)
+    console.log('[Verify] Erro:', error.message)
     return new Response(
-      JSON.stringify({ success: false, error: 'Erro interno do servidor' }),
+      JSON.stringify({ success: false, error: 'Erro interno' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
