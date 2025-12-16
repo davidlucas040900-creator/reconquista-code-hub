@@ -43,55 +43,49 @@ export function useCourses() {
   return useQuery({
     queryKey: ['courses'],
     queryFn: async () => {
-      // PASSO 1: Buscar cursos
+      console.log('[useCourses] Iniciando busca otimizada...');
+      const startTime = Date.now();
+
+      // QUERY ÚNICA COM JOINS
       const { data: courses, error: coursesError } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          course_modules!course_modules_course_id_fkey (
+            *,
+            course_lessons!course_lessons_module_id_fkey (
+              *
+            )
+          )
+        `)
         .eq('is_active', true)
-        .order('order_index');
+        .eq('course_modules.is_active', true)
+        .eq('course_modules.course_lessons.is_active', true)
+        .order('order_index')
+        .order('order_index', { foreignTable: 'course_modules' })
+        .order('order_index', { foreignTable: 'course_modules.course_lessons' });
 
-      if (coursesError) throw coursesError;
+      if (coursesError) {
+        console.error('[useCourses] Erro:', coursesError);
+        throw coursesError;
+      }
 
-      // PASSO 2: Para cada curso, buscar módulos
-      const coursesWithModules = await Promise.all(
-        (courses || []).map(async (course) => {
-          const { data: modules, error: modulesError } = await supabase
-            .from('course_modules')
-            .select('*')
-            .eq('course_id', course.id)
-            .eq('is_active', true)
-            .order('order_index');
+      const elapsed = Date.now() - startTime;
+      console.log(`[useCourses] Concluido em ${elapsed}ms`);
 
-          if (modulesError) throw modulesError;
-
-          // PASSO 3: Para cada módulo, buscar aulas
-          const modulesWithLessons = await Promise.all(
-            (modules || []).map(async (module) => {
-              const { data: lessons, error: lessonsError } = await supabase
-                .from('course_lessons')
-                .select('*')
-                .eq('module_id', module.id)
-                .eq('is_active', true)
-                .order('order_index');
-
-              if (lessonsError) throw lessonsError;
-
-              return {
-                ...module,
-                topics: module.topics || [],
-                course_lessons: lessons || []
-              };
-            })
-          );
-
-          return {
-            ...course,
-            course_modules: modulesWithLessons
-          };
-        })
-      );
+      // Transformar dados
+      const coursesWithModules = (courses || []).map(course => ({
+        ...course,
+        course_modules: (course.course_modules || []).map(module => ({
+          ...module,
+          topics: module.topics || [],
+          course_lessons: module.course_lessons || []
+        }))
+      }));
 
       return coursesWithModules as CourseWithModules[];
     },
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
+    cacheTime: 10 * 60 * 1000, // Manter em cache por 10 minutos
   });
 }
