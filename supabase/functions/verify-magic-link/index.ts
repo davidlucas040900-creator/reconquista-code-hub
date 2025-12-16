@@ -12,13 +12,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const startTime = Date.now()
-
   try {
     const body = await req.json()
     const token = body?.token
 
-    console.log('[Verify] Iniciando...')
+    console.log('[Verify] Iniciando verificacao de magic link...')
 
     if (!token) {
       return new Response(
@@ -47,7 +45,7 @@ serve(async (req) => {
       )
     }
 
-    // 2. Validar usado
+    // 2. Validar se ja foi usado
     if (magicLink.used_at) {
       console.log('[Verify] Token ja usado')
       return new Response(
@@ -65,18 +63,10 @@ serve(async (req) => {
       )
     }
 
-    console.log('[Verify] Token valido, user:', magicLink.user_id)
-
-    // 4. Marcar como usado
-    await supabaseAdmin
-      .from('magic_links')
-      .update({ used_at: new Date().toISOString() })
-      .eq('token', token)
-
-    // 5. Buscar usuario
+    // 4. Buscar dados do usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
 
-    if (userError || !userData?.user?.email) {
+    if (userError || !userData?.user) {
       console.log('[Verify] Usuario nao encontrado')
       return new Response(
         JSON.stringify({ success: false, error: 'Usuario nao encontrado.' }),
@@ -84,49 +74,80 @@ serve(async (req) => {
       )
     }
 
-    console.log('[Verify] Usuario:', userData.user.email)
+    console.log('[Verify] Usuario encontrado:', userData.user.email)
 
-    // 6. Gerar OTP link (magic link nativo do Supabase)
-    const { data: otpData, error: otpError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userData.user.email,
-      options: {
-        redirectTo: Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app/dashboard'
-      }
+    // 5. Marcar token como usado
+    await supabaseAdmin
+      .from('magic_links')
+      .update({ used_at: new Date().toISOString() })
+      .eq('token', token)
+
+    // 6. Limpar sessoes antigas do usuario
+    try {
+      await supabaseAdmin.rpc('delete_user_sessions', { p_user_id: magicLink.user_id })
+      console.log('[Verify] Sessoes antigas limpas')
+    } catch (e) {
+      console.log('[Verify] Aviso ao limpar sessoes:', e.message)
+    }
+
+    // 7. Gerar nova sessao usando Admin API
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+      user_id: magicLink.user_id
     })
 
-    if (otpError || !otpData) {
-      console.log('[Verify] Erro ao gerar OTP:', otpError?.message)
+    if (sessionError || !sessionData?.session) {
+      console.log('[Verify] Erro ao criar sessao:', sessionError?.message)
+      
+      // Fallback: gerar link de login nativo
+      const { data: linkData, error: linkGenError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: userData.user.email,
+      })
+
+      if (linkGenError || !linkData) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Erro ao gerar acesso.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Extrair token do link gerado
+      const url = new URL(linkData.properties.action_link)
+      const accessToken = url.searchParams.get('token')
+
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao gerar acesso.' }),
+        JSON.stringify({
+          success: true,
+          method: 'otp',
+          email: userData.user.email,
+          otp_token: accessToken,
+          user: {
+            id: userData.user.id,
+            email: userData.user.email
+          }
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 7. Extrair token_hash e access_token da URL gerada
-    const linkUrl = new URL(otpData.properties.action_link)
-    const accessToken = linkUrl.searchParams.get('token') || linkUrl.hash.split('access_token=')[1]?.split('&')[0]
-    
-    // O generateLink retorna os tokens diretamente
-    const hashed_token = otpData.properties.hashed_token
-
-    // 8. Log async
+    // 8. Log de acesso
     supabaseAdmin.from('access_logs').insert({
       user_id: magicLink.user_id,
       action: 'magic_link_login',
-      metadata: { elapsed_ms: Date.now() - startTime }
+      metadata: { method: 'session_direct' }
     }).then(() => {}).catch(() => {})
 
-    const elapsed = Date.now() - startTime
-    console.log(`[Verify] Sucesso em ${elapsed}ms`)
+    console.log('[Verify] Sessao criada com sucesso!')
 
-    // 9. Retornar dados para o frontend usar verifyOtp
+    // 9. Retornar sessao
     return new Response(
       JSON.stringify({
         success: true,
-        email: userData.user.email,
-        token_hash: hashed_token,
-        type: 'magiclink',
+        method: 'session',
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+        expires_in: sessionData.session.expires_in,
+        expires_at: sessionData.session.expires_at,
         user: {
           id: userData.user.id,
           email: userData.user.email

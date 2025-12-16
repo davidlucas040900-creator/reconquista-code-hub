@@ -20,19 +20,8 @@ const AutoLogin = () => {
 
     const processAutoLogin = async () => {
       try {
-        // 1. Verificar se ja esta logado
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        if (existingSession) {
-          console.log('[AutoLogin] Ja logado, redirecionando...');
-          setStatus('success');
-          setMessage('Voce ja esta logado! Redirecionando...');
-          window.location.href = '/dashboard';
-          return;
-        }
-
-        // 2. Obter token da URL
         const token = searchParams.get('token');
-        console.log('[AutoLogin] Processando token...');
+        console.log('[AutoLogin] Iniciando...');
 
         if (!token) {
           setStatus('error');
@@ -40,7 +29,11 @@ const AutoLogin = () => {
           return;
         }
 
-        // 3. Validar token no backend
+        // 1. Limpar sessao local existente
+        await supabase.auth.signOut();
+        console.log('[AutoLogin] Sessao local limpa');
+
+        // 2. Validar token no backend
         setMessage('Validando seu acesso...');
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
@@ -58,59 +51,55 @@ const AutoLogin = () => {
           return;
         }
 
-        // 4. Usar verifyOtp com o token_hash retornado
-        setMessage('Criando sessao...');
+        // 3. Processar resposta baseado no metodo
+        setMessage('Entrando na sua conta...');
 
-        if (data.token_hash && data.email) {
-          console.log('[AutoLogin] Verificando OTP...');
+        if (data.method === 'session' && data.access_token) {
+          // Metodo direto com tokens
+          const { error } = await supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token
+          });
+
+          if (error) {
+            console.error('[AutoLogin] Erro setSession:', error);
+            setStatus('error');
+            setMessage('Erro ao entrar. Tente novamente.');
+            return;
+          }
+
+          console.log('[AutoLogin] Sessao definida com sucesso!');
           
-          const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        } else if (data.method === 'otp' && data.otp_token) {
+          // Metodo OTP
+          const { error } = await supabase.auth.verifyOtp({
             email: data.email,
-            token: data.token_hash,
+            token: data.otp_token,
             type: 'magiclink'
           });
 
-          if (verifyError) {
-            console.error('[AutoLogin] Erro verifyOtp:', verifyError);
-            // Tentar metodo alternativo - signInWithOtp
-            console.log('[AutoLogin] Tentando signInWithOtp...');
-            
-            const { error: signInError } = await supabase.auth.signInWithOtp({
-              email: data.email,
-              options: {
-                shouldCreateUser: false
-              }
-            });
-
-            if (signInError) {
-              console.error('[AutoLogin] Erro signInWithOtp:', signInError);
-              setStatus('error');
-              setMessage('Erro ao criar sessao. Um novo link foi enviado para seu email.');
-              return;
-            }
-
-            // OTP enviado por email
-            setStatus('success');
-            setMessage('Um link de acesso foi enviado para seu email!');
+          if (error) {
+            console.error('[AutoLogin] Erro verifyOtp:', error);
+            setStatus('error');
+            setMessage('Erro ao verificar acesso. Tente novamente.');
             return;
           }
 
-          if (verifyData?.session) {
-            console.log('[AutoLogin] Sessao criada via verifyOtp!');
-            setStatus('success');
-            setMessage('Bem-vinda! Redirecionando...');
-            toast.success('Login realizado com sucesso!');
-            
-            setTimeout(() => {
-              window.location.href = '/dashboard';
-            }, 500);
-            return;
-          }
+          console.log('[AutoLogin] OTP verificado com sucesso!');
+        } else {
+          setStatus('error');
+          setMessage('Resposta invalida do servidor.');
+          return;
         }
 
-        // 5. Fallback - se nada funcionar, pedir novo login
-        setStatus('error');
-        setMessage('Erro ao processar login. Solicite um novo link.');
+        // 4. Sucesso
+        setStatus('success');
+        setMessage('Bem-vinda! Redirecionando...');
+        toast.success('Login realizado com sucesso!');
+
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 800);
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);

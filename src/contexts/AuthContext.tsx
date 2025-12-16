@@ -19,8 +19,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, whatsapp: string) => Promise<{ error: Error | null }>;
+  sendMagicLink: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -36,8 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchingProfile = useRef(false);
   const lastFetchedUserId = useRef<string | null>(null);
   const initialized = useRef(false);
-  const lastTokenRefresh = useRef<number>(0);
-  const tokenRefreshCount = useRef<number>(0);
 
   const createDefaultProfile = useCallback((userId: string, userEmail?: string): Profile => {
     return {
@@ -53,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<Profile | null> => {
     if (fetchingProfile.current && lastFetchedUserId.current === userId) {
-      console.log('[Auth] Ja buscando perfil, ignorando...');
       return null;
     }
 
@@ -91,12 +87,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .maybeSingle();
 
         if (insertError) {
-          console.error('[Auth] Erro ao criar perfil:', insertError);
           fetchingProfile.current = false;
           return createDefaultProfile(userId, userEmail);
         }
 
-        console.log('[Auth] Perfil criado:', newProfile?.email);
         fetchingProfile.current = false;
         return newProfile as Profile;
       }
@@ -105,7 +99,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       fetchingProfile.current = false;
       return data as Profile;
     } catch (error) {
-      console.error('[Auth] Erro ao buscar perfil:', error);
       fetchingProfile.current = false;
       return createDefaultProfile(userId, userEmail);
     }
@@ -130,11 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log('[Auth] Iniciando...');
 
-        const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('[Auth] Erro ao buscar sessao:', sessionError);
-        }
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
 
         console.log('[Auth] Sessao existente:', !!existingSession);
 
@@ -165,27 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!mounted) return;
 
-        // Protecao contra loop de TOKEN_REFRESHED
         if (event === 'TOKEN_REFRESHED') {
-          const now = Date.now();
-          const timeSinceLastRefresh = now - lastTokenRefresh.current;
-          
-          // Se refresh aconteceu ha menos de 5 segundos, ignorar
-          if (timeSinceLastRefresh < 5000) {
-            tokenRefreshCount.current++;
-            console.log('[Auth] Token refresh ignorado (muito rapido):', tokenRefreshCount.current);
-            
-            // Se houver mais de 3 refreshes em sequencia, parar
-            if (tokenRefreshCount.current > 3) {
-              console.log('[Auth] Muitos refreshes, parando loop');
-              return;
-            }
-          } else {
-            tokenRefreshCount.current = 0;
-          }
-          
-          lastTokenRefresh.current = now;
-          
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);
@@ -193,11 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // Reset contador em outros eventos
-        tokenRefreshCount.current = 0;
-
         if (event === 'SIGNED_OUT') {
-          console.log('[Auth] Signed out - limpando estado');
           setSession(null);
           setUser(null);
           setProfile(null);
@@ -212,15 +177,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(newSession.user);
             setLoading(false);
 
-            // Buscar perfil em background apenas se nao temos
             if (newSession.user.id !== lastFetchedUserId.current) {
-              setTimeout(async () => {
-                if (!mounted) return;
-                const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
-                if (profileData && mounted) {
-                  setProfile(profileData);
-                }
-              }, 100);
+              const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
+              if (profileData && mounted) {
+                setProfile(profileData);
+              }
             }
           }
         }
@@ -233,23 +194,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [fetchProfile]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  // MAGIC LINK - Unico metodo de login
+  const sendMagicLink = useCallback(async (email: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  }, []);
-
-  const signUp = useCallback(async (email: string, password: string, fullName: string, whatsapp: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
-          data: { full_name: fullName, whatsapp },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
       return { error };
@@ -264,12 +215,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     lastFetchedUserId.current = null;
     fetchingProfile.current = false;
-    tokenRefreshCount.current = 0;
     await supabase.auth.signOut();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      profile, 
+      loading, 
+      sendMagicLink, 
+      signOut, 
+      refreshProfile 
+    }}>
       {children}
     </AuthContext.Provider>
   );
