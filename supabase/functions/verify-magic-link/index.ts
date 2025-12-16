@@ -44,7 +44,6 @@ serve(async (req) => {
       )
     }
 
-    // 2. Validar usado
     if (magicLink.used_at) {
       return new Response(
         JSON.stringify({ success: false, error: 'Este link ja foi utilizado. Solicite um novo.' }),
@@ -52,7 +51,6 @@ serve(async (req) => {
       )
     }
 
-    // 3. Validar expiracao
     if (new Date(magicLink.expires_at) < new Date()) {
       return new Response(
         JSON.stringify({ success: false, error: 'Link expirado. Solicite um novo.' }),
@@ -60,7 +58,7 @@ serve(async (req) => {
       )
     }
 
-    // 4. Buscar usuario
+    // 2. Buscar usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
 
     if (userError || !userData?.user) {
@@ -72,45 +70,46 @@ serve(async (req) => {
 
     console.log('[Verify] Usuario:', userData.user.email)
 
-    // 5. Marcar como usado
+    // 3. Marcar como usado
     await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
       .eq('token', token)
 
-    // 6. Limpar sessoes antigas
-    try {
-      await supabaseAdmin.rpc('delete_user_sessions', { p_user_id: magicLink.user_id })
-    } catch (e) {
-      console.log('[Verify] Aviso sessoes:', e.message)
-    }
-
-    // 7. Gerar sessao via Admin API
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-      user_id: magicLink.user_id
+    // 4. Gerar magic link nativo do Supabase
+    const { data: linkData, error: linkGenError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userData.user.email
     })
 
-    if (sessionError || !sessionData?.session) {
-      console.log('[Verify] Erro createSession:', sessionError?.message)
+    if (linkGenError || !linkData) {
+      console.log('[Verify] Erro generateLink:', linkGenError?.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao criar sessao.' }),
+        JSON.stringify({ success: false, error: 'Erro ao gerar acesso.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 8. Log
+    // 5. Extrair o token do link gerado
+    // O link vem como: https://xxx.supabase.co/auth/v1/verify?token=xxx&type=magiclink&redirect_to=xxx
+    const actionLink = linkData.properties?.action_link
+    const hashed_token = linkData.properties?.hashed_token
+
+    console.log('[Verify] Link gerado com sucesso')
+
+    // 6. Log
     supabaseAdmin.from('access_logs').insert({
       user_id: magicLink.user_id,
       action: 'magic_link_login'
     }).then(() => {}).catch(() => {})
 
-    console.log('[Verify] Sucesso!')
-
+    // 7. Retornar dados para o frontend
     return new Response(
       JSON.stringify({
         success: true,
-        access_token: sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
+        email: userData.user.email,
+        hashed_token: hashed_token,
+        action_link: actionLink,
         user: {
           id: userData.user.id,
           email: userData.user.email

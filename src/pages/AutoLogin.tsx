@@ -50,36 +50,53 @@ const AutoLogin = () => {
           return;
         }
 
-        if (!data.access_token || !data.refresh_token) {
-          setStatus('error');
-          setMessage('Erro ao processar login.');
-          return;
-        }
-
-        // 3. Definir sessao
+        // 3. Verificar OTP com o hash retornado
         setMessage('Entrando...');
 
-        const { error } = await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token
-        });
+        if (data.hashed_token && data.email) {
+          const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+            email: data.email,
+            token: data.hashed_token,
+            type: 'email'
+          });
 
-        if (error) {
-          console.error('[AutoLogin] Erro:', error);
-          setStatus('error');
-          setMessage('Erro ao criar sessao.');
+          if (verifyError) {
+            console.log('[AutoLogin] Erro verifyOtp:', verifyError.message);
+            
+            // Fallback: redirecionar para o action_link
+            if (data.action_link) {
+              console.log('[AutoLogin] Usando action_link como fallback');
+              window.location.href = data.action_link;
+              return;
+            }
+            
+            setStatus('error');
+            setMessage('Erro ao verificar acesso.');
+            return;
+          }
+
+          if (verifyData?.session) {
+            console.log('[AutoLogin] Sessao criada!');
+            setStatus('success');
+            setMessage('Bem-vinda! Redirecionando...');
+            toast.success('Login realizado com sucesso!');
+
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 800);
+            return;
+          }
+        }
+
+        // 4. Fallback final: usar action_link
+        if (data.action_link) {
+          console.log('[AutoLogin] Redirecionando via action_link');
+          window.location.href = data.action_link;
           return;
         }
 
-        // 4. Sucesso
-        console.log('[AutoLogin] Sucesso!');
-        setStatus('success');
-        setMessage('Bem-vinda! Redirecionando...');
-        toast.success('Login realizado com sucesso!');
-
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 800);
+        setStatus('error');
+        setMessage('Erro ao processar login.');
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);
