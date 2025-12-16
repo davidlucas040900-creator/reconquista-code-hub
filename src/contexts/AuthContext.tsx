@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,8 +36,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchingProfile = useRef(false);
   const lastFetchedUserId = useRef<string | null>(null);
   const initialized = useRef(false);
+  const lastTokenRefresh = useRef<number>(0);
+  const tokenRefreshCount = useRef<number>(0);
 
-  const fetchProfile = async (userId: string, userEmail?: string, retryCount = 0): Promise<Profile | null> => {
+  const createDefaultProfile = useCallback((userId: string, userEmail?: string): Profile => {
+    return {
+      id: userId,
+      email: userEmail || '',
+      full_name: 'Usuario',
+      whatsapp: null,
+      has_full_access: true,
+      role: 'user',
+      avatar_url: null
+    };
+  }, []);
+
+  const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<Profile | null> => {
     if (fetchingProfile.current && lastFetchedUserId.current === userId) {
       console.log('[Auth] Ja buscando perfil, ignorando...');
       return null;
@@ -47,54 +61,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastFetchedUserId.current = userId;
 
     try {
-      console.log('[Auth] Buscando perfil para:', userId, retryCount > 0 ? `(tentativa ${retryCount + 1})` : '');
+      console.log('[Auth] Buscando perfil para:', userId);
 
-      // Timeout de 5 segundos para a query
-      const timeoutPromise = new Promise<null>((resolve) => 
-        setTimeout(() => resolve(null), 5000)
-      );
-
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
-
-      const result = await Promise.race([queryPromise, timeoutPromise]);
-
-      // Se deu timeout
-      if (result === null) {
-        console.log('[Auth] Timeout ao buscar perfil');
-        fetchingProfile.current = false;
-        
-        // Retornar perfil padrao para nao travar
-        return {
-          id: userId,
-          email: userEmail || '',
-          full_name: 'Usuario',
-          whatsapp: null,
-          has_full_access: true,
-          role: 'user',
-          avatar_url: null
-        } as Profile;
-      }
-
-      const { data, error } = result;
+        .maybeSingle();
 
       if (error) {
         console.log('[Auth] Erro ao buscar perfil:', error.message);
-        
-        // Se for erro de permissao e ainda temos retries, tentar novamente
-        if (retryCount < 2) {
-          console.log('[Auth] Tentando novamente em 500ms...');
-          fetchingProfile.current = false;
-          await new Promise(resolve => setTimeout(resolve, 500));
-          return fetchProfile(userId, userEmail, retryCount + 1);
-        }
+        fetchingProfile.current = false;
+        return createDefaultProfile(userId, userEmail);
+      }
 
-        // Criar perfil se nao existir
+      if (!data) {
         console.log('[Auth] Perfil nao encontrado, criando...');
-
+        
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
@@ -105,20 +88,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: 'user'
           })
           .select()
-          .single();
+          .maybeSingle();
 
         if (insertError) {
           console.error('[Auth] Erro ao criar perfil:', insertError);
           fetchingProfile.current = false;
-          return {
-            id: userId,
-            email: userEmail || '',
-            full_name: 'Usuario',
-            whatsapp: null,
-            has_full_access: true,
-            role: 'user',
-            avatar_url: null
-          } as Profile;
+          return createDefaultProfile(userId, userEmail);
         }
 
         console.log('[Auth] Perfil criado:', newProfile?.email);
@@ -132,26 +107,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('[Auth] Erro ao buscar perfil:', error);
       fetchingProfile.current = false;
-      return {
-        id: userId,
-        email: userEmail || '',
-        full_name: 'Usuario',
-        whatsapp: null,
-        has_full_access: true,
-        role: 'user',
-        avatar_url: null
-      } as Profile;
+      return createDefaultProfile(userId, userEmail);
     }
-  };
+  }, [createDefaultProfile]);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user?.id && !fetchingProfile.current) {
       const profileData = await fetchProfile(user.id, user.email);
       if (profileData) {
         setProfile(profileData);
       }
     }
-  };
+  }, [user, fetchProfile]);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -176,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(existingSession.user);
 
           const profileData = await fetchProfile(existingSession.user.id, existingSession.user.email);
-          if (profileData) {
+          if (profileData && mounted) {
             setProfile(profileData);
           }
         }
@@ -198,14 +165,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!mounted) return;
 
+        // Protecao contra loop de TOKEN_REFRESHED
         if (event === 'TOKEN_REFRESHED') {
-          console.log('[Auth] Token refreshed - actualizando sessao');
+          const now = Date.now();
+          const timeSinceLastRefresh = now - lastTokenRefresh.current;
+          
+          // Se refresh aconteceu ha menos de 5 segundos, ignorar
+          if (timeSinceLastRefresh < 5000) {
+            tokenRefreshCount.current++;
+            console.log('[Auth] Token refresh ignorado (muito rapido):', tokenRefreshCount.current);
+            
+            // Se houver mais de 3 refreshes em sequencia, parar
+            if (tokenRefreshCount.current > 3) {
+              console.log('[Auth] Muitos refreshes, parando loop');
+              return;
+            }
+          } else {
+            tokenRefreshCount.current = 0;
+          }
+          
+          lastTokenRefresh.current = now;
+          
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);
           }
           return;
         }
+
+        // Reset contador em outros eventos
+        tokenRefreshCount.current = 0;
 
         if (event === 'SIGNED_OUT') {
           console.log('[Auth] Signed out - limpando estado');
@@ -217,29 +206,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        if (newSession?.user) {
-          setSession(newSession);
-          setUser(newSession.user);
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          if (newSession?.user) {
+            setSession(newSession);
+            setUser(newSession.user);
+            setLoading(false);
 
-          // Nao bloquear - buscar perfil em background
-          if (newSession.user.id !== lastFetchedUserId.current || !profile) {
-            // Pequeno delay para garantir que a sessao foi propagada
-            setTimeout(async () => {
-              const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
-              if (profileData && mounted) {
-                setProfile(profileData);
-              }
-            }, 100);
+            // Buscar perfil em background apenas se nao temos
+            if (newSession.user.id !== lastFetchedUserId.current) {
+              setTimeout(async () => {
+                if (!mounted) return;
+                const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
+                if (profileData && mounted) {
+                  setProfile(profileData);
+                }
+              }, 100);
+            }
           }
-          
-          // Definir loading como false imediatamente
-          setLoading(false);
-        } else {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          lastFetchedUserId.current = null;
-          setLoading(false);
         }
       }
     );
@@ -248,18 +231,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error };
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string, fullName: string, whatsapp: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string, whatsapp: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -273,16 +256,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setProfile(null);
     setUser(null);
     setSession(null);
     lastFetchedUserId.current = null;
     fetchingProfile.current = false;
+    tokenRefreshCount.current = 0;
     await supabase.auth.signOut();
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}>
