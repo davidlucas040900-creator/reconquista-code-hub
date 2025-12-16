@@ -30,17 +30,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar usuario pelo email
-    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+    // Buscar usuario diretamente pelo email na tabela profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, has_full_access, full_name, email')
+      .eq('email', email.toLowerCase())
+      .maybeSingle()
 
-    if (usersError) {
-      console.log('[Request Access] Erro ao listar usuarios:', usersError.message)
-      throw new Error('Erro ao buscar usuarios')
+    if (profileError) {
+      console.log('[Request Access] Erro ao buscar perfil:', profileError.message)
+      throw new Error('Erro ao buscar usuario')
     }
 
-    const existingUser = usersData.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
-
-    if (!existingUser) {
+    if (!profile) {
       console.log('[Request Access] Usuario nao encontrado:', email)
       return new Response(
         JSON.stringify({
@@ -51,18 +53,7 @@ serve(async (req) => {
       )
     }
 
-    // Verificar se tem acesso
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('has_full_access, full_name')
-      .eq('id', existingUser.id)
-      .single()
-
-    if (profileError) {
-      console.log('[Request Access] Erro ao buscar perfil:', profileError.message)
-    }
-
-    if (!profile?.has_full_access) {
+    if (!profile.has_full_access) {
       console.log('[Request Access] Usuario sem acesso')
       return new Response(
         JSON.stringify({
@@ -73,11 +64,11 @@ serve(async (req) => {
       )
     }
 
-    // NOVO: Invalidar todos os tokens antigos NAO USADOS deste usuario
+    // Invalidar tokens antigos nao usados
     const { error: invalidateError } = await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
-      .eq('user_id', existingUser.id)
+      .eq('user_id', profile.id)
       .is('used_at', null)
 
     if (invalidateError) {
@@ -88,11 +79,11 @@ serve(async (req) => {
 
     // Gerar novo token
     const token = crypto.randomUUID() + '-' + Date.now().toString(36)
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
     // Inserir magic link
     const { error: insertError } = await supabaseAdmin.from('magic_links').insert({
-      user_id: existingUser.id,
+      user_id: profile.id,
       token: token,
       expires_at: expiresAt
     })
@@ -105,10 +96,10 @@ serve(async (req) => {
     console.log('[Request Access] Novo magic link criado')
 
     // Enviar email
-    const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista.vercel.app'
+    const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const magicLink = `${SITE_URL}/auto-login?token=${token}`
-    const firstName = profile?.full_name?.split(' ')[0] || 'Aluna'
+    const firstName = profile.full_name?.split(' ')[0] || 'Aluna'
 
     if (RESEND_API_KEY) {
       const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -162,7 +153,7 @@ serve(async (req) => {
     // Log de acesso
     try {
       await supabaseAdmin.from('access_logs').insert({
-        user_id: existingUser.id,
+        user_id: profile.id,
         action: 'request_access',
         metadata: { email, token_generated: true }
       })
