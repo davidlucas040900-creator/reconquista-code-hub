@@ -32,12 +32,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const fetchingProfile = useRef(false);
   const lastFetchedUserId = useRef<string | null>(null);
   const initialized = useRef(false);
 
-  const fetchProfile = async (userId: string, userEmail?: string): Promise<Profile | null> => {
+  const fetchProfile = async (userId: string, userEmail?: string, retryCount = 0): Promise<Profile | null> => {
     if (fetchingProfile.current && lastFetchedUserId.current === userId) {
       console.log('[Auth] Ja buscando perfil, ignorando...');
       return null;
@@ -47,15 +47,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastFetchedUserId.current = userId;
 
     try {
-      console.log('[Auth] Buscando perfil para:', userId);
-      
-      const { data, error } = await supabase
+      console.log('[Auth] Buscando perfil para:', userId, retryCount > 0 ? `(tentativa ${retryCount + 1})` : '');
+
+      // Timeout de 5 segundos para a query
+      const timeoutPromise = new Promise<null>((resolve) => 
+        setTimeout(() => resolve(null), 5000)
+      );
+
+      const queryPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+
+      // Se deu timeout
+      if (result === null) {
+        console.log('[Auth] Timeout ao buscar perfil');
+        fetchingProfile.current = false;
+        
+        // Retornar perfil padrao para nao travar
+        return {
+          id: userId,
+          email: userEmail || '',
+          full_name: 'Usuario',
+          whatsapp: null,
+          has_full_access: true,
+          role: 'user',
+          avatar_url: null
+        } as Profile;
+      }
+
+      const { data, error } = result;
+
       if (error) {
+        console.log('[Auth] Erro ao buscar perfil:', error.message);
+        
+        // Se for erro de permissao e ainda temos retries, tentar novamente
+        if (retryCount < 2) {
+          console.log('[Auth] Tentando novamente em 500ms...');
+          fetchingProfile.current = false;
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return fetchProfile(userId, userEmail, retryCount + 1);
+        }
+
+        // Criar perfil se nao existir
         console.log('[Auth] Perfil nao encontrado, criando...');
 
         const { data: newProfile, error: insertError } = await supabase
@@ -117,7 +154,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Evitar dupla inicializacao
     if (initialized.current) return;
     initialized.current = true;
 
@@ -127,9 +163,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log('[Auth] Iniciando...');
 
-        // Buscar sessao existente do localStorage
         const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
           console.error('[Auth] Erro ao buscar sessao:', sessionError);
         }
@@ -163,7 +198,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!mounted) return;
 
-        // TOKEN_REFRESHED - apenas actualizar sessao, nao buscar perfil
         if (event === 'TOKEN_REFRESHED') {
           console.log('[Auth] Token refreshed - actualizando sessao');
           if (newSession) {
@@ -173,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // SIGNED_OUT - limpar tudo
         if (event === 'SIGNED_OUT') {
           console.log('[Auth] Signed out - limpando estado');
           setSession(null);
@@ -184,26 +217,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // SIGNED_IN ou INITIAL_SESSION
         if (newSession?.user) {
           setSession(newSession);
           setUser(newSession.user);
 
-          // So buscar perfil se mudou o utilizador ou nao temos perfil
+          // Nao bloquear - buscar perfil em background
           if (newSession.user.id !== lastFetchedUserId.current || !profile) {
-            const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
-            if (profileData && mounted) {
-              setProfile(profileData);
-            }
+            // Pequeno delay para garantir que a sessao foi propagada
+            setTimeout(async () => {
+              const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
+              if (profileData && mounted) {
+                setProfile(profileData);
+              }
+            }, 100);
           }
+          
+          // Definir loading como false imediatamente
+          setLoading(false);
         } else {
           setSession(null);
           setUser(null);
           setProfile(null);
           lastFetchedUserId.current = null;
+          setLoading(false);
         }
-
-        setLoading(false);
       }
     );
 
