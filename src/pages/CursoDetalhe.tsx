@@ -350,7 +350,7 @@ export default function CursoDetalhe() {
               Adquira o acesso completo e comece sua transformação hoje.
             </p>
             <Button
-              onClick={() => window.open('https://pay.lojou.co/codigo-reconquista', '_blank')}
+              onClick={() => window.open('https://pay.lojou.app/p/HJo0Q', '_blank')}
               className="bg-gold hover:bg-gold-light text-noir-950 font-bold px-8 py-3 rounded-full"
             >
               QUERO ACESSO AGORA
@@ -370,3 +370,4 @@ export default function CursoDetalhe() {
     </div>
   );
 }
+

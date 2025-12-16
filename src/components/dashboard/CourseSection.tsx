@@ -1,4 +1,4 @@
-// src/components/dashboard/CourseSection.tsx
+﻿// src/components/dashboard/CourseSection.tsx
 
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Lock, Play } from 'lucide-react';
@@ -12,22 +12,22 @@ interface CourseSectionProps {
   activeTopicFilter: string;
 }
 
-// Descrições dos cursos
+// DescriÃ§Ãµes dos cursos
 const courseDescriptions: Record<string, string> = {
   'codigo-reconquista': 'A tua jornada passo a passo para o trazer de volta.',
-  'deusa-na-cama': 'Torna-te irresistível e faz ele implorar por mais.',
-  'santuario': 'O círculo exclusivo das mulheres que dominam o jogo.',
+  'deusa-na-cama': 'Torna-te irresistÃ­vel e faz ele implorar por mais.',
+  'santuario': 'O cÃ­rculo exclusivo das mulheres que dominam o jogo.',
 };
 
-// Descrições resumidas dos módulos do Santuário (por slug)
+// DescriÃ§Ãµes resumidas dos mÃ³dulos do SantuÃ¡rio (por slug)
 const santuarioModuleDescriptions: Record<string, string> = {
   'poder-onisciencia': 'Detecta mentiras e nunca mais seja enganada.',
-  'campo-batalha-digital': 'Posts estratégicos que ativam ciúmes e desejo.',
+  'campo-batalha-digital': 'Posts estratÃ©gicos que ativam ciÃºmes e desejo.',
   'acesso-cerebro': 'Respostas que desarmam qualquer ego masculino.',
   'blacklist-masculina': 'Neutraliza homens perigosos e poupe anos de sofrimento',
-  'protocolo-emergencia': 'Áudios de emergência para momentos críticos',
-  'diario-deusa': 'Áudios contra momentos de fraqueza.',
-  'mentorias-lives': 'Acelere seus resultados 10x mais rápido',
+  'protocolo-emergencia': 'Ãudios de emergÃªncia para momentos crÃ­ticos',
+  'diario-deusa': 'Ãudios contra momentos de fraqueza.',
+  'mentorias-lives': 'Acelere seus resultados 10x mais rÃ¡pido',
 };
 
 export function CourseSection({ course, activeTopicFilter }: CourseSectionProps) {
@@ -39,7 +39,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
   const hasAccess = accessData?.hasFullAccess || accessData?.purchasedCourses?.includes(course.slug);
   const isSantuario = course.slug === 'santuario';
 
-  // Filtrar módulos por tópico
+  // Filtrar mÃ³dulos por tÃ³pico
   const filteredModules = activeTopicFilter === 'all'
     ? course.course_modules || []
     : (course.course_modules || []).filter(module => 
@@ -50,7 +50,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     return null;
   }
 
-  // Calcular progresso por módulo
+  // Calcular progresso por mÃ³dulo
   const getModuleProgress = (module: ModuleWithLessons) => {
     if (!userProgress || !module.course_lessons?.length) return 0;
 
@@ -62,7 +62,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     return Math.round((completed / module.course_lessons.length) * 100);
   };
 
-  // Encontrar última aula assistida do módulo
+  // Encontrar Ãºltima aula assistida do mÃ³dulo
   const getLastWatchedLesson = (module: ModuleWithLessons) => {
     const lessons = module.course_lessons || [];
     for (const lesson of lessons) {
@@ -71,7 +71,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
         return lesson;
       }
     }
-    // Se nenhuma em progresso, retorna a primeira não completada
+    // Se nenhuma em progresso, retorna a primeira nÃ£o completada
     for (const lesson of lessons) {
       const progressData = userProgress?.find(p => p.lesson_id === lesson.id);
       if (!progressData?.is_completed) {
@@ -83,7 +83,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
 
   const handleModuleClick = (module: ModuleWithLessons) => {
     if (!hasAccess) {
-      window.open('https://pay.lojou.co/codigo-reconquista', '_blank');
+      window.open('https://pay.lojou.app/p/HJo0Q', '_blank');
       return;
     }
 
@@ -114,7 +114,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
         </p>
       </div>
 
-      {/* Slider de Módulos */}
+      {/* Slider de MÃ³dulos */}
       <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {filteredModules.map((module) => {
           const progress = getModuleProgress(module);
@@ -126,7 +126,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
               key={module.id}
               className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px] group"
             >
-              {/* Thumbnail - Clicável */}
+              {/* Thumbnail - ClicÃ¡vel */}
               <div
                 onClick={() => handleModuleClick(module)}
                 className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden bg-zinc-800 shadow-lg cursor-pointer"
@@ -176,7 +176,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
                 )}
               </div>
 
-              {/* Descrição - APENAS para módulos do Santuário */}
+              {/* DescriÃ§Ã£o - APENAS para mÃ³dulos do SantuÃ¡rio */}
               {moduleDescription && (
                 <p className="mt-2 text-xs text-silk-400 leading-tight px-1">
                   {moduleDescription}
@@ -189,3 +189,4 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     </section>
   );
 }
+

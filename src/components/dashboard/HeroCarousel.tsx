@@ -126,7 +126,7 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     if (hasAccess && firstLesson) {
       navigate(`/aula/${firstLesson.id}`);
     } else {
-      window.open('https://pay.lojou.co/codigo-reconquista', '_blank');
+      window.open('https://pay.lojou.app/p/HJo0Q', '_blank');
     }
   };
 
@@ -210,3 +210,4 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     </section>
   );
 }
+
