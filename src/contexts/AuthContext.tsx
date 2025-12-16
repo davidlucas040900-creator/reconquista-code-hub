@@ -34,6 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchingProfile = useRef(false);
   const lastFetchedUserId = useRef<string | null>(null);
   const initialized = useRef(false);
+  const lastEventTime = useRef<number>(0);
 
   const createDefaultProfile = useCallback((userId: string, userEmail?: string): Profile => ({
     id: userId,
@@ -116,6 +117,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('[Auth] Evento:', event);
       if (!mounted) return;
 
+      // Prevenir eventos duplicados em 5 segundos
+      const now = Date.now();
+      if (event === 'TOKEN_REFRESHED' && (now - lastEventTime.current) < 5000) {
+        console.log('[Auth] TOKEN_REFRESHED ignorado (muito rapido)');
+        return;
+      }
+      lastEventTime.current = now;
+
       if (event === 'TOKEN_REFRESHED' && newSession) {
         setSession(newSession);
         setUser(newSession.user);
@@ -155,6 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     lastFetchedUserId.current = null;
     fetchingProfile.current = false;
+    lastEventTime.current = 0;
     await supabase.auth.signOut();
   }, []);
 
