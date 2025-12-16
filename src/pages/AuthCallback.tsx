@@ -1,69 +1,51 @@
 ﻿import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Crown } from 'lucide-react';
 
 const AuthCallback = () => {
-  const navigate = useNavigate();
-
   useEffect(() => {
     const handleCallback = async () => {
       try {
         console.log('[Callback] Iniciando...');
         
-        // Extrair tokens do hash
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
-        console.log('[Callback] Tokens:', { 
-          hasAccess: !!accessToken, 
-          hasRefresh: !!refreshToken 
-        });
+        console.log('[Callback] Tokens:', { hasAccess: !!accessToken, hasRefresh: !!refreshToken });
 
         if (!accessToken || !refreshToken) {
-          console.error('[Callback] Tokens não encontrados na URL');
-          navigate('/login?error=no_tokens');
+          console.error('[Callback] Sem tokens');
+          window.location.href = '/login?error=no_tokens';
           return;
         }
 
         console.log('[Callback] Definindo sessão...');
         
-        const { data, error } = await supabase.auth.setSession({
+        // NÃO AGUARDAR - Setar e redirecionar imediatamente
+        supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken
+        }).then(({ data, error }) => {
+          console.log('[Callback] setSession concluído:', { temSession: !!data?.session, erro: error?.message });
         });
 
-        console.log('[Callback] setSession resultado:', { 
-          temData: !!data, 
-          temSession: !!data?.session,
-          temUser: !!data?.user,
-          erro: error?.message 
-        });
-
-        if (error) {
-          console.error('[Callback] Erro setSession:', error);
-          navigate('/login?error=set_session_failed');
-          return;
-        }
-
-        // FORÇAR REDIRECT IMEDIATAMENTE
-        console.log('[Callback] Redirecionando AGORA...');
+        // REDIRECIONAR IMEDIATAMENTE (não esperar perfil)
+        console.log('[Callback] Redirecionando...');
         
-        // Método 1: window.location (mais confiável)
         setTimeout(() => {
-          console.log('[Callback] Executando redirect...');
+          console.log('[Callback] REDIRECT AGORA!');
           window.location.href = '/dashboard';
-        }, 500);
+        }, 100);
 
       } catch (error) {
-        console.error('[Callback] Exception:', error);
-        navigate('/login?error=callback_exception');
+        console.error('[Callback] Erro:', error);
+        window.location.href = '/login?error=exception';
       }
     };
 
     handleCallback();
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
@@ -76,8 +58,7 @@ const AuthCallback = () => {
         </div>
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-          <p className="text-gray-400">Processando autenticação...</p>
-          <p className="text-gray-600 text-xs">Redirecionando em instantes...</p>
+          <p className="text-gray-400">Finalizando...</p>
         </div>
       </div>
     </div>
