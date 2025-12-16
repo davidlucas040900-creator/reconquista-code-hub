@@ -13,7 +13,6 @@ const AutoLogin = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verificando seu acesso...');
   const processedRef = useRef(false);
-  const redirectedRef = useRef(false);
 
   useEffect(() => {
     if (processedRef.current) return;
@@ -21,13 +20,17 @@ const AutoLogin = () => {
 
     const processAutoLogin = async () => {
       try {
+        // 1. Verificar se ja esta logado
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         if (existingSession) {
           console.log('[AutoLogin] Ja logado, redirecionando...');
-          redirectToSuccess();
+          setStatus('success');
+          setMessage('Voce ja esta logado! Redirecionando...');
+          window.location.href = '/dashboard';
           return;
         }
 
+        // 2. Obter token da URL
         const token = searchParams.get('token');
         console.log('[AutoLogin] Processando token...');
 
@@ -37,6 +40,7 @@ const AutoLogin = () => {
           return;
         }
 
+        // 3. Validar token no backend
         setMessage('Validando seu acesso...');
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
@@ -54,60 +58,65 @@ const AutoLogin = () => {
           return;
         }
 
-        if (!data.access_token || !data.refresh_token) {
-          setStatus('error');
-          setMessage('Erro ao processar login. Tokens nao recebidos.');
-          return;
-        }
-
+        // 4. Usar verifyOtp com o token_hash retornado
         setMessage('Criando sessao...');
 
-        // Definir sessao SEM aguardar - deixar o AuthContext processar em background
-        supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token
-        }).then(({ error }) => {
-          if (error) {
-            console.error('[AutoLogin] Erro setSession:', error);
-          } else {
-            console.log('[AutoLogin] setSession completado');
-          }
-        });
+        if (data.token_hash && data.email) {
+          console.log('[AutoLogin] Verificando OTP...');
+          
+          const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+            email: data.email,
+            token: data.token_hash,
+            type: 'magiclink'
+          });
 
-        // Aguardar um pouco e redirecionar
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Verificar se sessao foi criada
-        const { data: { session: newSession } } = await supabase.auth.getSession();
-        
-        if (newSession) {
-          console.log('[AutoLogin] Sessao confirmada!');
-          redirectToSuccess();
-        } else {
-          // Mesmo sem sessao confirmada, os tokens sao validos - redirecionar
-          console.log('[AutoLogin] Sessao pendente, redirecionando...');
-          redirectToSuccess();
+          if (verifyError) {
+            console.error('[AutoLogin] Erro verifyOtp:', verifyError);
+            // Tentar metodo alternativo - signInWithOtp
+            console.log('[AutoLogin] Tentando signInWithOtp...');
+            
+            const { error: signInError } = await supabase.auth.signInWithOtp({
+              email: data.email,
+              options: {
+                shouldCreateUser: false
+              }
+            });
+
+            if (signInError) {
+              console.error('[AutoLogin] Erro signInWithOtp:', signInError);
+              setStatus('error');
+              setMessage('Erro ao criar sessao. Um novo link foi enviado para seu email.');
+              return;
+            }
+
+            // OTP enviado por email
+            setStatus('success');
+            setMessage('Um link de acesso foi enviado para seu email!');
+            return;
+          }
+
+          if (verifyData?.session) {
+            console.log('[AutoLogin] Sessao criada via verifyOtp!');
+            setStatus('success');
+            setMessage('Bem-vinda! Redirecionando...');
+            toast.success('Login realizado com sucesso!');
+            
+            setTimeout(() => {
+              window.location.href = '/dashboard';
+            }, 500);
+            return;
+          }
         }
+
+        // 5. Fallback - se nada funcionar, pedir novo login
+        setStatus('error');
+        setMessage('Erro ao processar login. Solicite um novo link.');
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);
         setStatus('error');
         setMessage('Erro inesperado. Tente novamente.');
       }
-    };
-
-    const redirectToSuccess = () => {
-      if (redirectedRef.current) return;
-      redirectedRef.current = true;
-      
-      setStatus('success');
-      setMessage('Bem-vinda! Redirecionando...');
-      toast.success('Login realizado com sucesso!');
-      
-      // Usar window.location para garantir redirect limpo
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 500);
     };
 
     processAutoLogin();

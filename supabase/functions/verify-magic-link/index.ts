@@ -32,7 +32,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Buscar magic link (query optimizada - sem SELECT *)
+    // 1. Buscar magic link
     const { data: magicLink, error: linkError } = await supabaseAdmin
       .from('magic_links')
       .select('user_id, expires_at, used_at')
@@ -67,7 +67,7 @@ serve(async (req) => {
 
     console.log('[Verify] Token valido, user:', magicLink.user_id)
 
-    // 4. Marcar como usado ANTES (previne uso duplicado em requests paralelos)
+    // 4. Marcar como usado
     await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
@@ -75,7 +75,7 @@ serve(async (req) => {
 
     // 5. Buscar usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
-    
+
     if (userError || !userData?.user?.email) {
       console.log('[Verify] Usuario nao encontrado')
       return new Response(
@@ -86,36 +86,31 @@ serve(async (req) => {
 
     console.log('[Verify] Usuario:', userData.user.email)
 
-    // 6. Criar sessao (metodo optimizado com UUID mais curto)
-    const tempPass = crypto.randomUUID().split('-')[0] + Date.now().toString(36)
-
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      magicLink.user_id, 
-      { password: tempPass }
-    )
-
-    if (updateError) {
-      console.log('[Verify] Erro update:', updateError.message)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao preparar sessao.' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+    // 6. Gerar OTP link (magic link nativo do Supabase)
+    const { data: otpData, error: otpError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
       email: userData.user.email,
-      password: tempPass
+      options: {
+        redirectTo: Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app/dashboard'
+      }
     })
 
-    if (signInError || !signInData.session) {
-      console.log('[Verify] Erro signIn:', signInError?.message)
+    if (otpError || !otpData) {
+      console.log('[Verify] Erro ao gerar OTP:', otpError?.message)
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao criar sessao.' }),
+        JSON.stringify({ success: false, error: 'Erro ao gerar acesso.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 7. Log async (nao bloqueia resposta)
+    // 7. Extrair token_hash e access_token da URL gerada
+    const linkUrl = new URL(otpData.properties.action_link)
+    const accessToken = linkUrl.searchParams.get('token') || linkUrl.hash.split('access_token=')[1]?.split('&')[0]
+    
+    // O generateLink retorna os tokens diretamente
+    const hashed_token = otpData.properties.hashed_token
+
+    // 8. Log async
     supabaseAdmin.from('access_logs').insert({
       user_id: magicLink.user_id,
       action: 'magic_link_login',
@@ -125,15 +120,16 @@ serve(async (req) => {
     const elapsed = Date.now() - startTime
     console.log(`[Verify] Sucesso em ${elapsed}ms`)
 
-    // 8. Retornar (mesmo formato que AutoLogin.tsx espera)
+    // 9. Retornar dados para o frontend usar verifyOtp
     return new Response(
       JSON.stringify({
         success: true,
-        access_token: signInData.session.access_token,
-        refresh_token: signInData.session.refresh_token,
+        email: userData.user.email,
+        token_hash: hashed_token,
+        type: 'magiclink',
         user: {
-          id: signInData.user.id,
-          email: signInData.user.email
+          id: userData.user.id,
+          email: userData.user.email
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
