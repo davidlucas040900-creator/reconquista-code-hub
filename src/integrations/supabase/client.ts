@@ -5,8 +5,14 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Limpar sessões corrompidas/antigas ANTES de criar o cliente
+// Limpar sessões corrompidas APENAS se não estiver em callback
 const cleanCorruptedSessions = () => {
+  // NÃO limpar se estiver em /auth/callback
+  if (window.location.pathname.includes('/auth/callback')) {
+    console.log('[Supabase] Callback detectado, pulando limpeza');
+    return;
+  }
+
   try {
     console.log('[Supabase] Verificando sessões...');
     
@@ -21,11 +27,12 @@ const cleanCorruptedSessions = () => {
 
           const parsed = JSON.parse(value);
           
-          // Se expirou, remover
+          // Se expirou há mais de 1 dia, remover
           if (parsed.expires_at) {
             const expiresAt = new Date(parsed.expires_at * 1000);
-            if (expiresAt < new Date()) {
-              console.log('[Supabase] Removendo sessão expirada');
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            if (expiresAt < oneDayAgo) {
+              console.log('[Supabase] Removendo sessão muito antiga');
               localStorage.removeItem(key);
               cleaned = true;
             }
@@ -38,7 +45,6 @@ const cleanCorruptedSessions = () => {
             cleaned = true;
           }
         } catch (e) {
-          // JSON inválido = sessão corrompida
           console.log('[Supabase] Removendo sessão com JSON inválido');
           localStorage.removeItem(key);
           cleaned = true;
@@ -47,12 +53,7 @@ const cleanCorruptedSessions = () => {
     });
 
     if (cleaned) {
-      console.log('[Supabase] Sessões antigas removidas. Recarregando...');
-      // Recarregar página uma vez para aplicar limpeza
-      if (!sessionStorage.getItem('session_cleaned')) {
-        sessionStorage.setItem('session_cleaned', 'true');
-        window.location.reload();
-      }
+      console.log('[Supabase] Sessões antigas removidas');
     }
   } catch (e) {
     console.error('[Supabase] Erro ao limpar sessões:', e);
