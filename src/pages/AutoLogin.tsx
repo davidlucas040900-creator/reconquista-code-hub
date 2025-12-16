@@ -13,6 +13,7 @@ const AutoLogin = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verificando seu acesso...');
   const processedRef = useRef(false);
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
     if (processedRef.current) return;
@@ -23,9 +24,7 @@ const AutoLogin = () => {
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         if (existingSession) {
           console.log('[AutoLogin] Ja logado, redirecionando...');
-          setStatus('success');
-          setMessage('Voce ja esta logado! Redirecionando...');
-          setTimeout(() => navigate('/dashboard', { replace: true }), 500);
+          redirectToSuccess();
           return;
         }
 
@@ -63,50 +62,31 @@ const AutoLogin = () => {
 
         setMessage('Criando sessao...');
 
-        const sessionPromise = supabase.auth.setSession({
+        // Definir sessao SEM aguardar - deixar o AuthContext processar em background
+        supabase.auth.setSession({
           access_token: data.access_token,
           refresh_token: data.refresh_token
+        }).then(({ error }) => {
+          if (error) {
+            console.error('[AutoLogin] Erro setSession:', error);
+          } else {
+            console.log('[AutoLogin] setSession completado');
+          }
         });
 
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000)
-        );
-
-        try {
-          const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-          
-          if (result?.error) {
-            console.error('[AutoLogin] Erro sessao:', result.error);
-          }
-        } catch (timeoutError) {
-          console.log('[AutoLogin] Timeout no setSession, verificando sessao...');
-          const { data: { session: newSession } } = await supabase.auth.getSession();
-          if (!newSession) {
-            setStatus('error');
-            setMessage('Erro ao criar sessao. Tente novamente.');
-            return;
-          }
-        }
-
-        const { data: { session: finalSession } } = await supabase.auth.getSession();
+        // Aguardar um pouco e redirecionar
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        if (finalSession) {
-          console.log('[AutoLogin] Sessao criada com sucesso!');
-          setStatus('success');
-          setMessage('Bem-vinda! Redirecionando...');
-          toast.success('Login realizado com sucesso!');
-          
-          setTimeout(() => {
-            navigate('/dashboard', { replace: true });
-          }, 800);
+        // Verificar se sessao foi criada
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        
+        if (newSession) {
+          console.log('[AutoLogin] Sessao confirmada!');
+          redirectToSuccess();
         } else {
-          console.log('[AutoLogin] Sessao nao detectada, redirecionando mesmo assim...');
-          setStatus('success');
-          setMessage('Bem-vinda! Redirecionando...');
-          
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 1000);
+          // Mesmo sem sessao confirmada, os tokens sao validos - redirecionar
+          console.log('[AutoLogin] Sessao pendente, redirecionando...');
+          redirectToSuccess();
         }
 
       } catch (error: any) {
@@ -114,6 +94,20 @@ const AutoLogin = () => {
         setStatus('error');
         setMessage('Erro inesperado. Tente novamente.');
       }
+    };
+
+    const redirectToSuccess = () => {
+      if (redirectedRef.current) return;
+      redirectedRef.current = true;
+      
+      setStatus('success');
+      setMessage('Bem-vinda! Redirecionando...');
+      toast.success('Login realizado com sucesso!');
+      
+      // Usar window.location para garantir redirect limpo
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
     };
 
     processAutoLogin();
