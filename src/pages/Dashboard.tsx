@@ -1,16 +1,18 @@
 ﻿// src/pages/Dashboard.tsx
 
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { HeroCarousel } from '@/components/dashboard/HeroCarousel';
 import { TopicFilter } from '@/components/dashboard/TopicFilter';
-import { ProgressSection } from '@/components/dashboard/ProgressSection';
-import { CourseSection } from '@/components/dashboard/CourseSection';
 import { useCourses } from '@/hooks/useCourses';
 import { useAuth } from '@/contexts/AuthContext';
+import { Loader2 } from 'lucide-react';
 
-// Tópicos para filtro - SEXO ADICIONADO
+// Lazy load componentes pesados
+const HeroCarousel = lazy(() => import('@/components/dashboard/HeroCarousel').then(m => ({ default: m.HeroCarousel })));
+const ProgressSection = lazy(() => import('@/components/dashboard/ProgressSection').then(m => ({ default: m.ProgressSection })));
+const CourseSection = lazy(() => import('@/components/dashboard/CourseSection').then(m => ({ default: m.CourseSection })));
+
 const topics = [
   { id: 'all', name: 'Todos', icon: '' },
   { id: 'reconquista', name: 'Reconquista', icon: '' },
@@ -21,21 +23,16 @@ const topics = [
   { id: 'confianca', name: 'Confiança', icon: '' },
 ];
 
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center py-8">
+    <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+  </div>
+);
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: courses, isLoading, error } = useCourses();
   const [activeTopic, setActiveTopic] = useState('all');
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-noir-950 flex items-center justify-center">
-        <div className="text-center px-4">
-          <div className="w-12 h-12 md:w-16 md:h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400 text-sm md:text-base">Carregando cursos...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -50,38 +47,48 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-noir-950">
-      {/* Header Fixo */}
       <Header />
 
-      {/* Main Content */}
       <main className="pt-16 pb-20 md:pb-8">
+        {isLoading ? (
+          <div className="container mx-auto px-4 py-12">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
+              <p className="text-gray-400 text-sm">Carregando cursos...</p>
+            </div>
+          </div>
+        ) : (
+          <Suspense fallback={<LoadingSpinner />}>
+            <HeroCarousel courses={courses || []} />
+          </Suspense>
+        )}
 
-        {/* HERO CAROUSEL */}
-        <HeroCarousel courses={courses || []} />
+        {!isLoading && (
+          <>
+            <Suspense fallback={<LoadingSpinner />}>
+              <ProgressSection courses={courses || []} />
+            </Suspense>
 
-        {/* PROGRESS SECTION */}
-        <ProgressSection courses={courses || []} />
-
-        {/* FILTRO DE TÓPICOS */}
-        <TopicFilter
-          topics={topics}
-          activeTopic={activeTopic}
-          onTopicChange={setActiveTopic}
-        />
-
-        {/* COURSE SECTIONS */}
-        <div className="space-y-2 md:space-y-4">
-          {(courses || []).map((course) => (
-            <CourseSection
-              key={course.id}
-              course={course}
-              activeTopicFilter={activeTopic}
+            <TopicFilter
+              topics={topics}
+              activeTopic={activeTopic}
+              onTopicChange={setActiveTopic}
             />
-          ))}
-        </div>
+
+            <div className="space-y-2 md:space-y-4">
+              {(courses || []).map((course, index) => (
+                <Suspense key={course.id} fallback={<LoadingSpinner />}>
+                  <CourseSection
+                    course={course}
+                    activeTopicFilter={activeTopic}
+                  />
+                </Suspense>
+              ))}
+            </div>
+          </>
+        )}
       </main>
 
-      {/* Bottom Navigation (Mobile Only) */}
       <BottomNav />
     </div>
   );
