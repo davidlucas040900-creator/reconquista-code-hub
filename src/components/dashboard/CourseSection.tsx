@@ -14,7 +14,7 @@ interface CourseSectionProps {
 
 // Links de checkout por curso
 const checkoutLinks: Record<string, string> = {
-  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'codigo-reconquista': 'https://pay.lojou.app/p/qp5Vp',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
   'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
 // Descricoes dos cursos
@@ -88,7 +88,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
 
   const handleModuleClick = (module: ModuleWithLessons) => {
     if (!hasAccess) {
-      window.open(checkoutLinks[course.slug] || 'https://pay.lojou.app/p/HJo0Q', '_blank');
+      window.open(checkoutLinks[course.slug] || 'https://pay.lojou.app/p/qp5Vp', '_blank');
       return;
     }
 
@@ -194,6 +194,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     </section>
   );
 }
+
 
 
 

@@ -25,7 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 // Links de checkout por curso
 const checkoutLinks: Record<string, string> = {
-  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'codigo-reconquista': 'https://pay.lojou.app/p/qp5Vp',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
   'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
 
@@ -357,7 +357,7 @@ export default function CursoDetalhe() {
               Adquira o acesso completo e comece sua transformação hoje.
             </p>
             <Button
-              onClick={() => window.open(checkoutLinks[courseSlug || ''] || 'https://pay.lojou.app/p/HJo0Q', '_blank')}
+              onClick={() => window.open(checkoutLinks[courseSlug || ''] || 'https://pay.lojou.app/p/qp5Vp', '_blank')}
               className="bg-gold hover:bg-gold-light text-noir-950 font-bold px-8 py-3 rounded-full"
             >
               QUERO ACESSO AGORA
@@ -377,6 +377,7 @@ export default function CursoDetalhe() {
     </div>
   );
 }
+
 
 
 

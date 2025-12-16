@@ -48,7 +48,7 @@ function shuffleArray<T>(array: T[]): T[] {
 
 // Links de checkout por curso
 const checkoutLinks: Record<string, string> = {
-  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'codigo-reconquista': 'https://pay.lojou.app/p/qp5Vp',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
   'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
 export function HeroCarousel({ courses }: HeroCarouselProps) {
@@ -131,7 +131,7 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     if (hasAccess && firstLesson) {
       navigate(`/aula/${firstLesson.id}`);
     } else {
-      window.open(checkoutLinks[course.slug] || 'https://pay.lojou.app/p/HJo0Q', '_blank');
+      window.open(checkoutLinks[course.slug] || 'https://pay.lojou.app/p/qp5Vp', '_blank');
     }
   };
 
@@ -215,6 +215,7 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     </section>
   );
 }
+
 
 
 
