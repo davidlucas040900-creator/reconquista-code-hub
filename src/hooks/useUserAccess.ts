@@ -12,7 +12,6 @@ interface UserAccessData {
     courseId: string;
     courseSlug: string;
     courseName: string;
-    isActive: boolean;
   }[];
 }
 
@@ -38,20 +37,43 @@ export function useUserAccess() {
       const hasFullAccess = profile?.has_full_access || false;
       console.log('[useUserAccess] has_full_access:', hasFullAccess);
 
-      // 2. Buscar acessos da tabela user_courses (FONTE PRIMARIA)
+      // Se tem acesso total, buscar todos os cursos
+      if (hasFullAccess) {
+        const { data: allCourses } = await supabase
+          .from('courses')
+          .select('id, slug, name')
+          .eq('is_active', true);
+
+        const courseAccess: UserAccessData['courseAccess'] = [];
+        const purchasedCourses: string[] = [];
+
+        if (allCourses) {
+          allCourses.forEach((course: any) => {
+            courseAccess.push({
+              courseId: course.id,
+              courseSlug: course.slug,
+              courseName: course.name
+            });
+            purchasedCourses.push(course.slug);
+          });
+        }
+
+        console.log('[useUserAccess] Acesso total - todos os cursos:', purchasedCourses);
+        return { hasFullAccess: true, purchasedCourses, courseAccess };
+      }
+
+      // 2. Buscar acessos da tabela user_courses (sem is_active)
       const { data: userCourses, error: ucError } = await supabase
         .from('user_courses')
         .select(`
           course_id,
-          is_active,
-          courses:course_id (
+          courses (
             id,
             slug,
             name
           )
         `)
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+        .eq('user_id', user.id);
 
       if (ucError) {
         console.error('[useUserAccess] Erro ao buscar user_courses:', ucError);
@@ -67,8 +89,7 @@ export function useUserAccess() {
             courseAccess.push({
               courseId: course.id,
               courseSlug: course.slug,
-              courseName: course.name,
-              isActive: uc.is_active
+              courseName: course.name
             });
             if (!purchasedCourses.includes(course.slug)) {
               purchasedCourses.push(course.slug);
@@ -80,7 +101,6 @@ export function useUserAccess() {
       console.log('[useUserAccess] Cursos com acesso:', purchasedCourses);
 
       // 3. Fallback: Se nao tiver em user_courses, verificar purchases
-      // (para compatibilidade com compras antigas)
       if (purchasedCourses.length === 0) {
         const { data: purchases } = await supabase
           .from('purchases')
@@ -91,7 +111,6 @@ export function useUserAccess() {
         if (purchases && purchases.length > 0) {
           console.log('[useUserAccess] Fallback: encontradas', purchases.length, 'compras');
 
-          // Mapeamento de produto para slug de curso
           const productToCourse: Record<string, string> = {
             'codigo': 'codigo-reconquista',
             'reconquista': 'codigo-reconquista',
@@ -99,7 +118,6 @@ export function useUserAccess() {
             'exclusivo': 'exclusivo-1-porcento',
             '1%': 'exclusivo-1-porcento',
             'santuario': 'santuario',
-            'santuário': 'santuario',
           };
 
           purchases.forEach(p => {
@@ -123,7 +141,7 @@ export function useUserAccess() {
       };
     },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000, // 2 minutos
+    staleTime: 2 * 60 * 1000,
   });
 }
 
