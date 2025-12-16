@@ -33,12 +33,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // REF para evitar chamadas duplicadas
   const fetchingProfile = useRef(false);
   const lastFetchedUserId = useRef<string | null>(null);
+  const initialized = useRef(false);
 
   const fetchProfile = async (userId: string, userEmail?: string): Promise<Profile | null> => {
-    // Evitar chamadas duplicadas para o mesmo utilizador
     if (fetchingProfile.current && lastFetchedUserId.current === userId) {
       console.log('[Auth] Ja buscando perfil, ignorando...');
       return null;
@@ -73,7 +72,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (insertError) {
           console.error('[Auth] Erro ao criar perfil:', insertError);
-          const defaultProfile = {
+          fetchingProfile.current = false;
+          return {
             id: userId,
             email: userEmail || '',
             full_name: 'Usuario',
@@ -82,9 +82,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: 'user',
             avatar_url: null
           } as Profile;
-          
-          fetchingProfile.current = false;
-          return defaultProfile;
         }
 
         console.log('[Auth] Perfil criado:', newProfile?.email);
@@ -120,13 +117,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    // Evitar dupla inicializacao
+    if (initialized.current) return;
+    initialized.current = true;
+
     let mounted = true;
 
     const initAuth = async () => {
       try {
         console.log('[Auth] Iniciando...');
 
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        // Buscar sessao existente do localStorage
+        const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[Auth] Erro ao buscar sessao:', sessionError);
+        }
+
         console.log('[Auth] Sessao existente:', !!existingSession);
 
         if (mounted && existingSession?.user) {
@@ -156,25 +163,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!mounted) return;
 
-        // IGNORAR eventos que nao mudam o utilizador
+        // TOKEN_REFRESHED - apenas actualizar sessao, nao buscar perfil
         if (event === 'TOKEN_REFRESHED') {
-          console.log('[Auth] Token refreshed - ignorando fetch de perfil');
-          setSession(newSession);
+          console.log('[Auth] Token refreshed - actualizando sessao');
+          if (newSession) {
+            setSession(newSession);
+            setUser(newSession.user);
+          }
           return;
         }
 
-        // IGNORAR se e o mesmo utilizador e ja temos perfil
-        if (event === 'SIGNED_IN' && newSession?.user?.id === lastFetchedUserId.current && profile) {
-          console.log('[Auth] Mesmo utilizador, ja tem perfil - ignorando');
+        // SIGNED_OUT - limpar tudo
+        if (event === 'SIGNED_OUT') {
+          console.log('[Auth] Signed out - limpando estado');
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          lastFetchedUserId.current = null;
+          setLoading(false);
+          return;
+        }
+
+        // SIGNED_IN ou INITIAL_SESSION
+        if (newSession?.user) {
           setSession(newSession);
           setUser(newSession.user);
-          return;
-        }
 
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-
-        if (newSession?.user) {
           // So buscar perfil se mudou o utilizador ou nao temos perfil
           if (newSession.user.id !== lastFetchedUserId.current || !profile) {
             const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
@@ -183,6 +197,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
         } else {
+          setSession(null);
+          setUser(null);
           setProfile(null);
           lastFetchedUserId.current = null;
         }
@@ -224,6 +240,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     setProfile(null);
+    setUser(null);
+    setSession(null);
     lastFetchedUserId.current = null;
     fetchingProfile.current = false;
     await supabase.auth.signOut();

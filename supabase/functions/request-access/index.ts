@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // Buscar usuario pelo email
     const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
-    
+
     if (usersError) {
       console.log('[Request Access] Erro ao listar usuarios:', usersError.message)
       throw new Error('Erro ao buscar usuarios')
@@ -73,9 +73,22 @@ serve(async (req) => {
       )
     }
 
-    // Gerar token
+    // NOVO: Invalidar todos os tokens antigos NAO USADOS deste usuario
+    const { error: invalidateError } = await supabaseAdmin
+      .from('magic_links')
+      .update({ used_at: new Date().toISOString() })
+      .eq('user_id', existingUser.id)
+      .is('used_at', null)
+
+    if (invalidateError) {
+      console.log('[Request Access] Erro ao invalidar tokens antigos:', invalidateError.message)
+    } else {
+      console.log('[Request Access] Tokens antigos invalidados')
+    }
+
+    // Gerar novo token
     const token = crypto.randomUUID() + '-' + Date.now().toString(36)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
 
     // Inserir magic link
     const { error: insertError } = await supabaseAdmin.from('magic_links').insert({
@@ -89,10 +102,10 @@ serve(async (req) => {
       throw new Error('Erro ao gerar link de acesso')
     }
 
-    console.log('[Request Access] Magic link criado')
+    console.log('[Request Access] Novo magic link criado')
 
     // Enviar email
-    const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
+    const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista.vercel.app'
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const magicLink = `${SITE_URL}/auto-login?token=${token}`
     const firstName = profile?.full_name?.split(' ')[0] || 'Aluna'
@@ -107,22 +120,22 @@ serve(async (req) => {
         body: JSON.stringify({
           from: 'Codigo da Reconquista <acesso@codigodareconquista.xyz>',
           to: email,
-          subject: ` ${firstName}, aqui esta seu link de acesso!`,
+          subject: `${firstName}, aqui esta seu link de acesso!`,
           html: `
             <div style="font-family:Arial;max-width:600px;margin:0 auto;padding:40px 20px;background:#0a0a0a;color:#fff;">
               <div style="text-align:center;margin-bottom:30px;">
-                <span style="font-size:24px;font-weight:bold;color:#D4AF37;"> Reconquista</span>
+                <span style="font-size:24px;font-weight:bold;color:#D4AF37;">Reconquista</span>
               </div>
               <div style="background:#1a1a1a;border:1px solid #D4AF3733;border-radius:16px;padding:35px;">
                 <h1 style="color:#D4AF37;font-size:24px;margin:0 0 15px;text-align:center;">
-                  Ola, ${firstName}! 
+                  Ola, ${firstName}!
                 </h1>
                 <p style="color:#fff;font-size:16px;line-height:1.6;text-align:center;margin:0 0 25px;">
                   Voce solicitou acesso a sua area de membros.<br>
                   Clique no botao abaixo para entrar:
                 </p>
                 <div style="text-align:center;margin:30px 0;">
-                  <a href="${magicLink}" 
+                  <a href="${magicLink}"
                      style="display:inline-block;background:linear-gradient(135deg,#D4AF37,#F4E06D);
                             color:#000;padding:16px 40px;text-decoration:none;border-radius:10px;
                             font-weight:bold;font-size:16px;">
@@ -130,7 +143,7 @@ serve(async (req) => {
                   </a>
                 </div>
                 <p style="color:#666;font-size:12px;text-align:center;">
-                  Este link expira em 24 horas.
+                  Este link expira em 7 dias.
                 </p>
               </div>
             </div>
@@ -146,7 +159,7 @@ serve(async (req) => {
       }
     }
 
-    // Log de acesso (sem .catch)
+    // Log de acesso
     try {
       await supabaseAdmin.from('access_logs').insert({
         user_id: existingUser.id,
