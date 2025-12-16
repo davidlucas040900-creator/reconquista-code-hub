@@ -23,10 +23,10 @@ interface Course {
 
 // Links de checkout por curso
 const checkoutLinks: Record<string, string> = {
-  'codigo-reconquista': 'https://pay.lojou.co/codigo-reconquista',
-  'deusa-na-cama': 'https://pay.lojou.co/deusa-na-cama',
-  'exclusivo-1-porcento': 'https://pay.lojou.co/exclusivo-1-porcento',
-  'santuario': 'https://pay.lojou.co/santuario',
+  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
+  'santuario': 'https://pay.lojou.app/p/santuario',
 };
 
 export default function Cursos() {
@@ -281,3 +281,4 @@ export default function Cursos() {
     </div>
   );
 }
+
