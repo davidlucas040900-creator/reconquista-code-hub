@@ -20,7 +20,9 @@ const PRODUCT_MAP: Record<string, string> = {
   'exclusivo_1': 'Acesso Exclusivo para os 1%',
   'exclusivo-1': 'Acesso Exclusivo para os 1%',
   'exclusivo_1_essencial': 'Acesso Exclusivo para os 1% - Essencial',
-  'exclusivo-1-essencial': 'Acesso Exclusivo para os 1% - Essencial',}
+  'exclusivo-1-essencial': 'Acesso Exclusivo para os 1% - Essencial',
+  'santuario': 'O Santuario',
+}
 
 // ==============================================
 // MAPEAMENTO DE PRODUTO -> CURSO (SLUG)
@@ -35,7 +37,9 @@ const PRODUCT_TO_COURSE: Record<string, string> = {
   'exclusivo_1': 'exclusivo-1-porcento',
   'exclusivo-1': 'exclusivo-1-porcento',
   'exclusivo_1_essencial': 'exclusivo-1-porcento',
-  'exclusivo-1-essencial': 'exclusivo-1-porcento',}
+  'exclusivo-1-essencial': 'exclusivo-1-porcento',
+  'santuario': 'santuario',
+}
 
 function identifyProductByName(productName: string): { slug: string; standardName: string } {
   const name = productName.toLowerCase()
@@ -302,4 +306,3 @@ serve(async (req) => {
     )
   }
 })
-
