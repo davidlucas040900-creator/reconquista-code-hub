@@ -12,7 +12,21 @@ interface CourseSectionProps {
   activeTopicFilter: string;
 }
 
+// Links de checkout por curso
+const checkoutLinks: Record<string, string> = {
+  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
+  'santuario': 'https://pay.lojou.app/p/santuario',
+};
 // DescriÃ§Ãµes dos cursos
+// Links de checkout por curso
+const checkoutLinks: Record<string, string> = {
+  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
+  'santuario': 'https://pay.lojou.app/p/santuario',
+};
 const courseDescriptions: Record<string, string> = {
   'codigo-reconquista': 'A tua jornada passo a passo para o trazer de volta.',
   'deusa-na-cama': 'Torna-te irresistÃ­vel e faz ele implorar por mais.',
@@ -83,7 +97,7 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
 
   const handleModuleClick = (module: ModuleWithLessons) => {
     if (!hasAccess) {
-      window.open('https://pay.lojou.app/p/HJo0Q', '_blank');
+      window.open(checkoutLinks[course.slug] || 'https://pay.lojou.app/p/HJo0Q', '_blank');
       return;
     }
 
@@ -189,4 +203,5 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     </section>
   );
 }
+
 

@@ -22,6 +22,15 @@ import {
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+
+// Links de checkout por curso
+const checkoutLinks: Record<string, string> = {
+  'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
+  'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
+  'santuario': 'https://pay.lojou.app/p/santuario',
+};
+
 interface Module {
   id: string;
   name: string;
@@ -350,7 +359,7 @@ export default function CursoDetalhe() {
               Adquira o acesso completo e comece sua transformação hoje.
             </p>
             <Button
-              onClick={() => window.open('https://pay.lojou.app/p/HJo0Q', '_blank')}
+              onClick={() => window.open(checkoutLinks[courseSlug || ''] || 'https://pay.lojou.app/p/HJo0Q', '_blank')}
               className="bg-gold hover:bg-gold-light text-noir-950 font-bold px-8 py-3 rounded-full"
             >
               QUERO ACESSO AGORA
@@ -370,4 +379,5 @@ export default function CursoDetalhe() {
     </div>
   );
 }
+
 
