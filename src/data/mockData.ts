@@ -226,3 +226,4 @@ export const getWelcomeMessage = (courseSlug: string): string => {
   };
   return messages[courseSlug] || 'Bem-vinda à sua jornada de transformação.';
 };
+

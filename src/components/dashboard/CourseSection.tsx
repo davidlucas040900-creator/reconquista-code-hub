@@ -16,9 +16,7 @@ interface CourseSectionProps {
 const checkoutLinks: Record<string, string> = {
   'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
-  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
-  'santuario': 'https://pay.lojou.app/p/santuario',
-};
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
 // Descricoes dos cursos
 const courseDescriptions: Record<string, string> = {
   'codigo-reconquista': 'A tua jornada passo a passo para o trazer de volta.',
@@ -196,6 +194,8 @@ export function CourseSection({ course, activeTopicFilter }: CourseSectionProps)
     </section>
   );
 }
+
+
 
 
 

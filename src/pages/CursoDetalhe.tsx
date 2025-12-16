@@ -27,9 +27,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 const checkoutLinks: Record<string, string> = {
   'codigo-reconquista': 'https://pay.lojou.app/p/HJo0Q',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
-  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
-  'santuario': 'https://pay.lojou.app/p/santuario',
-};
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
 
 interface Module {
   id: string;
@@ -379,5 +377,7 @@ export default function CursoDetalhe() {
     </div>
   );
 }
+
+
 
 

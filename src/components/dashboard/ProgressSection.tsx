@@ -191,3 +191,4 @@ export function ProgressSection({ courses }: ProgressSectionProps) {
     </section>
   );
 }
+

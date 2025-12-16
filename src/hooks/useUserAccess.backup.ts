@@ -65,3 +65,4 @@ export function useHasCourseAccess(courseSlug: string) {
   if (data.hasFullAccess) return true;
   return data.purchasedCourses.includes(courseSlug);
 }
+
