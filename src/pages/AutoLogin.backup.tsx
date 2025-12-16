@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -12,32 +12,29 @@ const AutoLogin = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verificando seu acesso...');
-  const processedRef = useRef(false);
 
   useEffect(() => {
-    if (processedRef.current) return;
-    processedRef.current = true;
-
     const processAutoLogin = async () => {
+      // Verificar se ja esta logado
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      if (existingSession) {
+        console.log('[AutoLogin] Ja logado, redirecionando...');
+        setStatus('success');
+        setMessage('Voce ja esta logado! Redirecionando...');
+        setTimeout(() => navigate('/dashboard'), 500);
+        return;
+      }
+
+      const token = searchParams.get('token');
+      console.log('[AutoLogin] Processando token...');
+      
+      if (!token) {
+        setStatus('error');
+        setMessage('Link invalido. Token nao encontrado.');
+        return;
+      }
+
       try {
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        if (existingSession) {
-          console.log('[AutoLogin] Ja logado, redirecionando...');
-          setStatus('success');
-          setMessage('Voce ja esta logado! Redirecionando...');
-          setTimeout(() => navigate('/dashboard', { replace: true }), 500);
-          return;
-        }
-
-        const token = searchParams.get('token');
-        console.log('[AutoLogin] Processando token...');
-
-        if (!token) {
-          setStatus('error');
-          setMessage('Link invalido. Token nao encontrado.');
-          return;
-        }
-
         setMessage('Validando seu acesso...');
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
@@ -55,59 +52,33 @@ const AutoLogin = () => {
           return;
         }
 
-        if (!data.access_token || !data.refresh_token) {
-          setStatus('error');
-          setMessage('Erro ao processar login. Tokens nao recebidos.');
-          return;
-        }
-
-        setMessage('Criando sessao...');
-
-        const sessionPromise = supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token
-        });
-
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000)
-        );
-
-        try {
-          const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        if (data.access_token && data.refresh_token) {
+          setMessage('Criando sessao...');
           
-          if (result?.error) {
-            console.error('[AutoLogin] Erro sessao:', result.error);
-          }
-        } catch (timeoutError) {
-          console.log('[AutoLogin] Timeout no setSession, verificando sessao...');
-          const { data: { session: newSession } } = await supabase.auth.getSession();
-          if (!newSession) {
+          // Definir sessao com os tokens
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token
+          });
+
+          if (sessionError) {
+            console.error('[AutoLogin] Erro sessao:', sessionError);
             setStatus('error');
             setMessage('Erro ao criar sessao. Tente novamente.');
             return;
           }
-        }
 
-        const { data: { session: finalSession } } = await supabase.auth.getSession();
-        
-        if (finalSession) {
-          console.log('[AutoLogin] Sessao criada com sucesso!');
+          console.log('[AutoLogin] Sessao criada!');
           setStatus('success');
           setMessage('Bem-vinda! Redirecionando...');
           toast.success('Login realizado com sucesso!');
           
-          setTimeout(() => {
-            navigate('/dashboard', { replace: true });
-          }, 800);
-        } else {
-          console.log('[AutoLogin] Sessao nao detectada, redirecionando mesmo assim...');
-          setStatus('success');
-          setMessage('Bem-vinda! Redirecionando...');
-          
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 1000);
+          setTimeout(() => navigate('/dashboard'), 1000);
+          return;
         }
+
+        setStatus('error');
+        setMessage('Erro ao processar login.');
 
       } catch (error: any) {
         console.error('[AutoLogin] Erro:', error);
