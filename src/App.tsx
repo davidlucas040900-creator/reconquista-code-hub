@@ -10,6 +10,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 // Paginas publicas
 import Login from './pages/Login';
 import AutoLogin from './pages/AutoLogin';
+import AuthCallback from './pages/AuthCallback';
 import SemAcesso from './pages/SemAcesso';
 import NotFound from './pages/NotFound';
 
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/auto-login" element={<AutoLogin />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/sem-acesso" element={<SemAcesso />} />
               <Route path="/test-plyr" element={<TestPlyr />} />
 

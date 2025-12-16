@@ -30,7 +30,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Buscar magic link
     const { data: magicLink, error: linkError } = await supabaseAdmin
       .from('magic_links')
       .select('user_id, expires_at, used_at')
@@ -58,7 +57,6 @@ serve(async (req) => {
       )
     }
 
-    // 2. Buscar usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
 
     if (userError || !userData?.user) {
@@ -70,16 +68,17 @@ serve(async (req) => {
 
     console.log('[Verify] Usuario:', userData.user.email)
 
-    // 3. Marcar como usado
     await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
       .eq('token', token)
 
-    // 4. Gerar magic link nativo do Supabase
     const { data: linkData, error: linkGenError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: userData.user.email
+      email: userData.user.email,
+      options: {
+        redirectTo: 'https://areademembrocodigodareconquista-nine.vercel.app/auth/callback'
+      }
     })
 
     if (linkGenError || !linkData) {
@@ -90,26 +89,17 @@ serve(async (req) => {
       )
     }
 
-    // 5. Extrair o token do link gerado
-    // O link vem como: https://xxx.supabase.co/auth/v1/verify?token=xxx&type=magiclink&redirect_to=xxx
-    const actionLink = linkData.properties?.action_link
-    const hashed_token = linkData.properties?.hashed_token
-
     console.log('[Verify] Link gerado com sucesso')
 
-    // 6. Log
     supabaseAdmin.from('access_logs').insert({
       user_id: magicLink.user_id,
       action: 'magic_link_login'
     }).then(() => {}).catch(() => {})
 
-    // 7. Retornar dados para o frontend
     return new Response(
       JSON.stringify({
         success: true,
-        email: userData.user.email,
-        hashed_token: hashed_token,
-        action_link: actionLink,
+        action_link: linkData.properties?.action_link,
         user: {
           id: userData.user.id,
           email: userData.user.email
