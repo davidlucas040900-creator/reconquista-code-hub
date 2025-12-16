@@ -29,11 +29,10 @@ const AutoLogin = () => {
           return;
         }
 
-        // 1. Limpar sessao local existente
+        // 1. Limpar sessao local
         await supabase.auth.signOut();
-        console.log('[AutoLogin] Sessao local limpa');
 
-        // 2. Validar token no backend
+        // 2. Validar token
         setMessage('Validando seu acesso...');
 
         const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
@@ -51,48 +50,29 @@ const AutoLogin = () => {
           return;
         }
 
-        // 3. Processar resposta baseado no metodo
-        setMessage('Entrando na sua conta...');
-
-        if (data.method === 'session' && data.access_token) {
-          // Metodo direto com tokens
-          const { error } = await supabase.auth.setSession({
-            access_token: data.access_token,
-            refresh_token: data.refresh_token
-          });
-
-          if (error) {
-            console.error('[AutoLogin] Erro setSession:', error);
-            setStatus('error');
-            setMessage('Erro ao entrar. Tente novamente.');
-            return;
-          }
-
-          console.log('[AutoLogin] Sessao definida com sucesso!');
-          
-        } else if (data.method === 'otp' && data.otp_token) {
-          // Metodo OTP
-          const { error } = await supabase.auth.verifyOtp({
-            email: data.email,
-            token: data.otp_token,
-            type: 'magiclink'
-          });
-
-          if (error) {
-            console.error('[AutoLogin] Erro verifyOtp:', error);
-            setStatus('error');
-            setMessage('Erro ao verificar acesso. Tente novamente.');
-            return;
-          }
-
-          console.log('[AutoLogin] OTP verificado com sucesso!');
-        } else {
+        if (!data.access_token || !data.refresh_token) {
           setStatus('error');
-          setMessage('Resposta invalida do servidor.');
+          setMessage('Erro ao processar login.');
+          return;
+        }
+
+        // 3. Definir sessao
+        setMessage('Entrando...');
+
+        const { error } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
+        });
+
+        if (error) {
+          console.error('[AutoLogin] Erro:', error);
+          setStatus('error');
+          setMessage('Erro ao criar sessao.');
           return;
         }
 
         // 4. Sucesso
+        console.log('[AutoLogin] Sucesso!');
         setStatus('success');
         setMessage('Bem-vinda! Redirecionando...');
         toast.success('Login realizado com sucesso!');

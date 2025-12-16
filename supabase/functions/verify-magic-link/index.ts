@@ -16,7 +16,7 @@ serve(async (req) => {
     const body = await req.json()
     const token = body?.token
 
-    console.log('[Verify] Iniciando verificacao de magic link...')
+    console.log('[Verify] Iniciando...')
 
     if (!token) {
       return new Response(
@@ -38,16 +38,14 @@ serve(async (req) => {
       .single()
 
     if (linkError || !magicLink) {
-      console.log('[Verify] Token nao encontrado')
       return new Response(
         JSON.stringify({ success: false, error: 'Link invalido ou nao encontrado.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 2. Validar se ja foi usado
+    // 2. Validar usado
     if (magicLink.used_at) {
-      console.log('[Verify] Token ja usado')
       return new Response(
         JSON.stringify({ success: false, error: 'Este link ja foi utilizado. Solicite um novo.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,98 +54,63 @@ serve(async (req) => {
 
     // 3. Validar expiracao
     if (new Date(magicLink.expires_at) < new Date()) {
-      console.log('[Verify] Token expirado')
       return new Response(
         JSON.stringify({ success: false, error: 'Link expirado. Solicite um novo.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 4. Buscar dados do usuario
+    // 4. Buscar usuario
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(magicLink.user_id)
 
     if (userError || !userData?.user) {
-      console.log('[Verify] Usuario nao encontrado')
       return new Response(
         JSON.stringify({ success: false, error: 'Usuario nao encontrado.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Verify] Usuario encontrado:', userData.user.email)
+    console.log('[Verify] Usuario:', userData.user.email)
 
-    // 5. Marcar token como usado
+    // 5. Marcar como usado
     await supabaseAdmin
       .from('magic_links')
       .update({ used_at: new Date().toISOString() })
       .eq('token', token)
 
-    // 6. Limpar sessoes antigas do usuario
+    // 6. Limpar sessoes antigas
     try {
       await supabaseAdmin.rpc('delete_user_sessions', { p_user_id: magicLink.user_id })
-      console.log('[Verify] Sessoes antigas limpas')
     } catch (e) {
-      console.log('[Verify] Aviso ao limpar sessoes:', e.message)
+      console.log('[Verify] Aviso sessoes:', e.message)
     }
 
-    // 7. Gerar nova sessao usando Admin API
+    // 7. Gerar sessao via Admin API
     const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
       user_id: magicLink.user_id
     })
 
     if (sessionError || !sessionData?.session) {
-      console.log('[Verify] Erro ao criar sessao:', sessionError?.message)
-      
-      // Fallback: gerar link de login nativo
-      const { data: linkData, error: linkGenError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
-        email: userData.user.email,
-      })
-
-      if (linkGenError || !linkData) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Erro ao gerar acesso.' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      // Extrair token do link gerado
-      const url = new URL(linkData.properties.action_link)
-      const accessToken = url.searchParams.get('token')
-
+      console.log('[Verify] Erro createSession:', sessionError?.message)
       return new Response(
-        JSON.stringify({
-          success: true,
-          method: 'otp',
-          email: userData.user.email,
-          otp_token: accessToken,
-          user: {
-            id: userData.user.id,
-            email: userData.user.email
-          }
-        }),
+        JSON.stringify({ success: false, error: 'Erro ao criar sessao.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 8. Log de acesso
+    // 8. Log
     supabaseAdmin.from('access_logs').insert({
       user_id: magicLink.user_id,
-      action: 'magic_link_login',
-      metadata: { method: 'session_direct' }
+      action: 'magic_link_login'
     }).then(() => {}).catch(() => {})
 
-    console.log('[Verify] Sessao criada com sucesso!')
+    console.log('[Verify] Sucesso!')
 
-    // 9. Retornar sessao
     return new Response(
       JSON.stringify({
         success: true,
-        method: 'session',
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
-        expires_in: sessionData.session.expires_in,
-        expires_at: sessionData.session.expires_at,
         user: {
           id: userData.user.id,
           email: userData.user.email

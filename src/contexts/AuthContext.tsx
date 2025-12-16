@@ -19,7 +19,6 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  sendMagicLink: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -36,28 +35,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const lastFetchedUserId = useRef<string | null>(null);
   const initialized = useRef(false);
 
-  const createDefaultProfile = useCallback((userId: string, userEmail?: string): Profile => {
-    return {
-      id: userId,
-      email: userEmail || '',
-      full_name: 'Usuario',
-      whatsapp: null,
-      has_full_access: true,
-      role: 'user',
-      avatar_url: null
-    };
-  }, []);
+  const createDefaultProfile = useCallback((userId: string, userEmail?: string): Profile => ({
+    id: userId,
+    email: userEmail || '',
+    full_name: 'Usuario',
+    whatsapp: null,
+    has_full_access: true,
+    role: 'user',
+    avatar_url: null
+  }), []);
 
   const fetchProfile = useCallback(async (userId: string, userEmail?: string): Promise<Profile | null> => {
-    if (fetchingProfile.current && lastFetchedUserId.current === userId) {
-      return null;
-    }
+    if (fetchingProfile.current && lastFetchedUserId.current === userId) return null;
 
     fetchingProfile.current = true;
     lastFetchedUserId.current = userId;
 
     try {
-      console.log('[Auth] Buscando perfil para:', userId);
+      console.log('[Auth] Buscando perfil:', userId);
 
       const { data, error } = await supabase
         .from('profiles')
@@ -65,38 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) {
-        console.log('[Auth] Erro ao buscar perfil:', error.message);
-        fetchingProfile.current = false;
+      fetchingProfile.current = false;
+
+      if (error || !data) {
+        console.log('[Auth] Perfil nao encontrado, usando padrao');
         return createDefaultProfile(userId, userEmail);
       }
 
-      if (!data) {
-        console.log('[Auth] Perfil nao encontrado, criando...');
-        
-        const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            email: userEmail || '',
-            full_name: 'Usuario',
-            has_full_access: true,
-            role: 'user'
-          })
-          .select()
-          .maybeSingle();
-
-        if (insertError) {
-          fetchingProfile.current = false;
-          return createDefaultProfile(userId, userEmail);
-        }
-
-        fetchingProfile.current = false;
-        return newProfile as Profile;
-      }
-
-      console.log('[Auth] Perfil encontrado:', data?.email);
-      fetchingProfile.current = false;
+      console.log('[Auth] Perfil encontrado:', data.email);
       return data as Profile;
     } catch (error) {
       fetchingProfile.current = false;
@@ -107,9 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshProfile = useCallback(async () => {
     if (user?.id && !fetchingProfile.current) {
       const profileData = await fetchProfile(user.id, user.email);
-      if (profileData) {
-        setProfile(profileData);
-      }
+      if (profileData) setProfile(profileData);
     }
   }, [user, fetchProfile]);
 
@@ -122,19 +91,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initAuth = async () => {
       try {
         console.log('[Auth] Iniciando...');
-
         const { data: { session: existingSession } } = await supabase.auth.getSession();
-
         console.log('[Auth] Sessao existente:', !!existingSession);
 
         if (mounted && existingSession?.user) {
           setSession(existingSession);
           setUser(existingSession.user);
-
           const profileData = await fetchProfile(existingSession.user.id, existingSession.user.email);
-          if (profileData && mounted) {
-            setProfile(profileData);
-          }
+          if (profileData && mounted) setProfile(profileData);
         }
       } catch (error) {
         console.error('[Auth] Erro:', error);
@@ -148,66 +112,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        console.log('[Auth] Evento:', event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('[Auth] Evento:', event);
+      if (!mounted) return;
 
-        if (!mounted) return;
+      if (event === 'TOKEN_REFRESHED' && newSession) {
+        setSession(newSession);
+        setUser(newSession.user);
+        return;
+      }
 
-        if (event === 'TOKEN_REFRESHED') {
-          if (newSession) {
-            setSession(newSession);
-            setUser(newSession.user);
-          }
-          return;
-        }
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        lastFetchedUserId.current = null;
+        setLoading(false);
+        return;
+      }
 
-        if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          lastFetchedUserId.current = null;
-          setLoading(false);
-          return;
-        }
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && newSession?.user) {
+        setSession(newSession);
+        setUser(newSession.user);
+        setLoading(false);
 
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-          if (newSession?.user) {
-            setSession(newSession);
-            setUser(newSession.user);
-            setLoading(false);
-
-            if (newSession.user.id !== lastFetchedUserId.current) {
-              const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
-              if (profileData && mounted) {
-                setProfile(profileData);
-              }
-            }
-          }
+        if (newSession.user.id !== lastFetchedUserId.current) {
+          const profileData = await fetchProfile(newSession.user.id, newSession.user.email);
+          if (profileData && mounted) setProfile(profileData);
         }
       }
-    );
+    });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
-
-  // MAGIC LINK - Unico metodo de login
-  const sendMagicLink = useCallback(async (email: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-      return { error };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  }, []);
 
   const signOut = useCallback(async () => {
     setProfile(null);
@@ -219,15 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      profile, 
-      loading, 
-      sendMagicLink, 
-      signOut, 
-      refreshProfile 
-    }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
