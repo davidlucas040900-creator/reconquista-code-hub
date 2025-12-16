@@ -11,52 +11,36 @@ const corsHeaders = {
 // MAPEAMENTO DE PRODUTOS LOJOU -> NOME PADRAO
 // ==============================================
 const PRODUCT_MAP: Record<string, string> = {
-  // Codigo da Reconquista
   'codigo_reconquista': 'O Codigo da Reconquista - Programa Completo',
   'codigo-reconquista': 'O Codigo da Reconquista - Programa Completo',
-  
-  // Deusa na Cama
   'deusa_vip': 'A Deusa na Cama - Acesso VIP',
   'deusa-vip': 'A Deusa na Cama - Acesso VIP',
   'deusa_essencial': 'A Deusa na Cama - Essencial',
   'deusa-essencial': 'A Deusa na Cama - Essencial',
-  
-  // Exclusivo 1%
   'exclusivo_1': 'Acesso Exclusivo para os 1%',
   'exclusivo-1': 'Acesso Exclusivo para os 1%',
   'exclusivo_1_essencial': 'Acesso Exclusivo para os 1% - Essencial',
   'exclusivo-1-essencial': 'Acesso Exclusivo para os 1% - Essencial',
-  
-  // Santuario
   'santuario': 'O Santuario',
 }
 
 // ==============================================
 // MAPEAMENTO DE PRODUTO -> CURSO (SLUG)
-// Produtos Essencial/Downsell dao acesso ao mesmo curso que o VIP/Upsell
 // ==============================================
 const PRODUCT_TO_COURSE: Record<string, string> = {
-  // Codigo da Reconquista -> curso codigo-reconquista
   'codigo_reconquista': 'codigo-reconquista',
   'codigo-reconquista': 'codigo-reconquista',
-  
-  // Deusa na Cama (VIP e Essencial) -> curso deusa-na-cama
   'deusa_vip': 'deusa-na-cama',
   'deusa-vip': 'deusa-na-cama',
   'deusa_essencial': 'deusa-na-cama',
   'deusa-essencial': 'deusa-na-cama',
-  
-  // Exclusivo 1% (VIP e Essencial) -> curso exclusivo-1-porcento
   'exclusivo_1': 'exclusivo-1-porcento',
   'exclusivo-1': 'exclusivo-1-porcento',
   'exclusivo_1_essencial': 'exclusivo-1-porcento',
   'exclusivo-1-essencial': 'exclusivo-1-porcento',
-  
-  // Santuario -> curso santuario
   'santuario': 'santuario',
 }
 
-// Funcao para identificar produto pelo nome (fallback)
 function identifyProductByName(productName: string): { slug: string; standardName: string } {
   const name = productName.toLowerCase()
   
@@ -79,7 +63,6 @@ function identifyProductByName(productName: string): { slug: string; standardNam
     return { slug: 'santuario', standardName: 'O Santuario' }
   }
   
-  // Default: Codigo da Reconquista
   return { slug: 'codigo-reconquista', standardName: productName }
 }
 
@@ -98,7 +81,6 @@ serve(async (req) => {
     console.log('[Lojou] ========== WEBHOOK RECEBIDO ==========')
     console.log('[Lojou] Payload:', JSON.stringify(payload, null, 2))
 
-    // 1. EXTRAIR DADOS DO PAYLOAD
     const rawEmail = payload.email || payload.customer?.email || payload.buyer?.email || ''
     const email = rawEmail.toLowerCase().trim()
     const name = payload.name || payload.customer?.name || payload.buyer?.name || 'Cliente'
@@ -110,15 +92,11 @@ serve(async (req) => {
     const status = payload.status || payload.event || 'unknown'
     const transactionId = payload.id || payload.transaction_id || crypto.randomUUID()
 
-    console.log('[Lojou] Email extraido:', email)
-    console.log('[Lojou] Nome:', name)
+    console.log('[Lojou] Email:', email)
     console.log('[Lojou] Produto ID:', lojouProductId)
     console.log('[Lojou] Produto Nome:', originalProductName)
-    console.log('[Lojou] Status:', status)
 
-    // 2. VALIDAR EMAIL
     if (!email) {
-      console.error('[Lojou] ERRO: Email nao encontrado no payload')
       return new Response(
         JSON.stringify({ success: false, error: 'Email nao encontrado' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -127,152 +105,99 @@ serve(async (req) => {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      console.error('[Lojou] ERRO: Email com formato invalido:', email)
       return new Response(
         JSON.stringify({ success: false, error: 'Formato de email invalido' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 3. VALIDAR STATUS DO PAGAMENTO
     const approvedStatuses = ['approved', 'paid', 'completed', 'confirmed', 'payment.approved', 'success']
     const statusLower = String(status).toLowerCase()
     const isApproved = approvedStatuses.some(s => statusLower.includes(s.replace('payment.', '')))
 
     if (!isApproved) {
-      console.log('[Lojou] Status nao aprovado, ignorando:', status)
+      console.log('[Lojou] Status nao aprovado:', status)
       return new Response(
         JSON.stringify({ received: true, reason: 'Status not approved', status: status }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 4. IDENTIFICAR PRODUTO E CURSO
     let courseSlug = PRODUCT_TO_COURSE[lojouProductId]
     let standardizedName = PRODUCT_MAP[lojouProductId]
     
-    // Se nao encontrou pelo ID, tentar pelo nome
     if (!courseSlug || !standardizedName) {
-      console.log('[Lojou] Produto nao encontrado pelo ID, tentando pelo nome...')
       const identified = identifyProductByName(originalProductName)
       courseSlug = courseSlug || identified.slug
       standardizedName = standardizedName || identified.standardName
     }
     
-    console.log('[Lojou] Produto padronizado:', standardizedName)
-    console.log('[Lojou] Curso slug:', courseSlug)
+    console.log('[Lojou] Curso:', courseSlug)
 
-    // 5. BUSCAR OU CRIAR USUARIO
+    // BUSCAR OU CRIAR USUARIO
     let userId: string | null = null
-    let userEmail: string = email
 
-    console.log('[Lojou] [PASSO 5.1] Buscando usuario no Auth...')
-    const { data: authUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-
-    if (listError) {
-      console.error('[Lojou] Erro ao listar usuarios:', listError.message)
-    } else if (authUsers?.users) {
-      const existingAuthUser = authUsers.users.find(u => u.email?.toLowerCase() === email)
-      if (existingAuthUser) {
-        userId = existingAuthUser.id
-        userEmail = existingAuthUser.email || email
-        console.log('[Lojou] Usuario ENCONTRADO no Auth:', userId)
-      }
-    }
-
-    if (!userId) {
-      console.log('[Lojou] [PASSO 5.2] Usuario nao existe no Auth, criando...')
-
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    const existingUser = authUsers?.users?.find(u => u.email?.toLowerCase() === email)
+    
+    if (existingUser) {
+      userId = existingUser.id
+      console.log('[Lojou] Usuario encontrado:', userId)
+    } else {
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: email,
         email_confirm: true,
-        user_metadata: {
-          full_name: name,
-          whatsapp: whatsapp,
-          source: 'lojou_payment',
-          created_via: 'webhook'
-        }
+        user_metadata: { full_name: name, whatsapp: whatsapp, source: 'lojou_payment' }
       })
 
       if (createError) {
-        console.error('[Lojou] Erro ao criar usuario:', createError.message)
-
         if (createError.message.includes('already') || createError.message.includes('exists')) {
-          console.log('[Lojou] Usuario ja existe, buscando novamente...')
           const { data: retryUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
           const retryUser = retryUsers?.users?.find(u => u.email?.toLowerCase() === email)
-          if (retryUser) {
-            userId = retryUser.id
-            console.log('[Lojou] Usuario encontrado no retry:', userId)
-          }
+          if (retryUser) userId = retryUser.id
         }
-
-        if (!userId) {
-          throw new Error('Falha ao criar usuario: ' + createError.message)
-        }
+        if (!userId) throw new Error('Falha ao criar usuario: ' + createError.message)
       } else if (newUser?.user) {
         userId = newUser.user.id
-        console.log('[Lojou] Novo usuario criado com sucesso:', userId)
+        console.log('[Lojou] Usuario criado:', userId)
       }
     }
 
-    if (!userId) {
-      throw new Error('Impossivel obter ID do usuario apos todas as tentativas')
-    }
+    if (!userId) throw new Error('Impossivel obter ID do usuario')
 
-    // 6. SINCRONIZAR PROFILE
-    console.log('[Lojou] [PASSO 6] Sincronizando profile...')
-
+    // SINCRONIZAR PROFILE - SEM has_full_access = true
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .select('id, email')
+      .select('id')
       .eq('id', userId)
       .maybeSingle()
 
     if (existingProfile) {
-      console.log('[Lojou] Profile existente, atualizando...')
       await supabaseAdmin
         .from('profiles')
         .update({
           email: email,
           full_name: name,
           whatsapp: whatsapp,
-          has_full_access: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)
     } else {
-      console.log('[Lojou] Profile nao existe, criando...')
-      const { error: insertError } = await supabaseAdmin
+      await supabaseAdmin
         .from('profiles')
         .insert({
           id: userId,
           email: email,
           full_name: name,
           whatsapp: whatsapp,
-          has_full_access: true,
+          has_full_access: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-
-      if (insertError && insertError.code === '23505') {
-        await supabaseAdmin
-          .from('profiles')
-          .update({
-            email: email,
-            full_name: name,
-            whatsapp: whatsapp,
-            has_full_access: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId)
-      }
     }
 
-    // 7. REGISTRAR COMPRA
-    console.log('[Lojou] [PASSO 7] Registrando compra...')
-
-    const { data: purchaseData, error: purchaseError } = await supabaseAdmin
+    // REGISTRAR COMPRA
+    const { data: purchaseData } = await supabaseAdmin
       .from('purchases')
       .insert({
         user_id: userId,
@@ -291,15 +216,7 @@ serve(async (req) => {
       .select('id')
       .single()
 
-    if (purchaseError) {
-      console.error('[Lojou] Erro ao registrar compra:', purchaseError.message)
-    } else {
-      console.log('[Lojou] Compra registrada, ID:', purchaseData?.id)
-    }
-
-    // 8. CONCEDER ACESSO AO CURSO
-    console.log('[Lojou] [PASSO 8] Concedendo acesso ao curso:', courseSlug)
-
+    // CONCEDER ACESSO AO CURSO ESPECIFICO
     const { data: courseData } = await supabaseAdmin
       .from('courses')
       .select('id, name')
@@ -308,31 +225,22 @@ serve(async (req) => {
       .single()
 
     if (courseData?.id) {
-      const { error: accessError } = await supabaseAdmin
+      await supabaseAdmin
         .from('user_courses')
         .upsert({
           user_id: userId,
           course_id: courseData.id,
-          purchase_id: purchaseData?.id,
-          is_active: true
+          purchase_id: purchaseData?.id
         }, { onConflict: 'user_id,course_id' })
-
-      if (accessError) {
-        console.error('[Lojou] Erro ao conceder acesso:', accessError.message)
-      } else {
-        console.log('[Lojou] Acesso concedido ao curso:', courseData.name)
-      }
-    } else {
-      console.log('[Lojou] Curso nao encontrado:', courseSlug)
+      
+      console.log('[Lojou] Acesso concedido:', courseData.name)
     }
 
-    // 9. CRIAR MAGIC LINK
-    console.log('[Lojou] [PASSO 9] Criando magic link...')
-
+    // CRIAR MAGIC LINK
     const token = crypto.randomUUID() + '-' + Date.now().toString(36)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
-    const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin
+    await supabaseAdmin
       .from('magic_links')
       .insert({
         user_id: userId,
@@ -341,53 +249,15 @@ serve(async (req) => {
         product_id: lojouProductId,
         product_name: standardizedName
       })
-      .select('id')
-      .single()
 
-    if (magicLinkError) {
-      console.error('[Lojou] ERRO ao criar magic_link:', magicLinkError.message)
-      throw new Error('Falha ao criar magic link: ' + magicLinkError.message)
-    }
-
-    console.log('[Lojou] Magic link criado, ID:', magicLinkData?.id)
-
-    // 10. ENVIAR EMAIL
+    // ENVIAR EMAIL
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
     const magicLink = `${SITE_URL}/auto-login?token=${token}`
     const firstName = name.split(' ')[0]
 
-    console.log('[Lojou] [PASSO 10] Enviando email...')
-    console.log('[Lojou] Magic Link:', magicLink)
-
     if (RESEND_API_KEY) {
-      const htmlContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%); color: #ffffff; border-radius: 10px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #D4AF37; margin: 0; font-size: 28px;">Parabens, ${firstName}! </h1>
-          </div>
-          <p style="font-size: 16px; line-height: 1.6; color: #e0e0e0;">
-            Seu acesso ao <strong style="color: #D4AF37;">${standardizedName}</strong> foi liberado com sucesso!
-          </p>
-          <p style="font-size: 16px; line-height: 1.6; color: #e0e0e0;">
-            Clique no botao abaixo para acessar sua area de membros:
-          </p>
-          <div style="text-align: center; margin: 35px 0;">
-            <a href="${magicLink}" style="display: inline-block; padding: 18px 40px; background: linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%); color: #000000; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);">
-              ACESSAR MINHA AREA DE MEMBROS
-            </a>
-          </div>
-          <p style="font-size: 14px; color: #888; text-align: center;">
-            Este link e valido por 7 dias.
-          </p>
-          <hr style="border: none; border-top: 1px solid #333; margin: 30px 0;">
-          <p style="font-size: 12px; color: #666; text-align: center;">
-            Se voce nao solicitou este acesso, ignore este email.
-          </p>
-        </div>
-      `
-
-      const emailResponse = await fetch('https://api.resend.com/emails', {
+      await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
@@ -397,26 +267,23 @@ serve(async (req) => {
           from: 'Codigo da Reconquista <acesso@codigodareconquista.xyz>',
           to: email,
           subject: `${firstName}, seu acesso foi liberado!`,
-          html: htmlContent
+          html: `
+            <div style="font-family: Arial; max-width: 600px; margin: 0 auto; padding: 40px; background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%); color: #fff; border-radius: 10px;">
+              <h1 style="color: #D4AF37; text-align: center;">Parabens, ${firstName}!</h1>
+              <p style="color: #e0e0e0;">Seu acesso ao <strong style="color: #D4AF37;">${standardizedName}</strong> foi liberado!</p>
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="${magicLink}" style="display: inline-block; padding: 18px 40px; background: linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%); color: #000; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  ACESSAR MINHA AREA DE MEMBROS
+                </a>
+              </div>
+              <p style="color: #888; text-align: center; font-size: 14px;">Este link e valido por 7 dias.</p>
+            </div>
+          `
         })
       })
-
-      if (emailResponse.ok) {
-        console.log('[Lojou] Email enviado com sucesso!')
-      } else {
-        const emailError = await emailResponse.text()
-        console.error('[Lojou] Erro ao enviar email:', emailError)
-      }
-    } else {
-      console.warn('[Lojou] RESEND_API_KEY nao configurada')
     }
 
-    // 11. LOG DE SUCESSO
-    console.log('[Lojou] ========== WEBHOOK PROCESSADO COM SUCESSO ==========')
-    console.log('[Lojou] User ID:', userId)
-    console.log('[Lojou] Email:', email)
-    console.log('[Lojou] Produto:', standardizedName)
-    console.log('[Lojou] Curso:', courseSlug)
+    console.log('[Lojou] ========== SUCESSO ==========')
 
     return new Response(
       JSON.stringify({
@@ -432,10 +299,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[Lojou] ========== ERRO FATAL ==========')
-    console.error('[Lojou] Mensagem:', error.message)
-    console.error('[Lojou] Stack:', error.stack)
-
+    console.error('[Lojou] ERRO:', error.message)
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
