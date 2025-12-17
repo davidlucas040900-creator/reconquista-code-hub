@@ -7,9 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// ==============================================
-// MAPEAMENTO DE PRODUTOS LOJOU -> NOME PADRAO
-// ==============================================
 const PRODUCT_MAP: Record<string, string> = {
   'codigo_reconquista': 'O Codigo da Reconquista - Programa Completo',
   'codigo-reconquista': 'O Codigo da Reconquista - Programa Completo',
@@ -17,16 +14,15 @@ const PRODUCT_MAP: Record<string, string> = {
   'deusa-vip': 'A Deusa na Cama - Acesso VIP',
   'deusa_essencial': 'A Deusa na Cama - Essencial',
   'deusa-essencial': 'A Deusa na Cama - Essencial',
+  'deusa-na-cama': 'A Deusa na Cama',
   'exclusivo_1': 'Acesso Exclusivo para os 1%',
   'exclusivo-1': 'Acesso Exclusivo para os 1%',
   'exclusivo_1_essencial': 'Acesso Exclusivo para os 1% - Essencial',
   'exclusivo-1-essencial': 'Acesso Exclusivo para os 1% - Essencial',
+  'exclusivo-1-porcento': 'Acesso Exclusivo para os 1%',
   'santuario': 'O Santuario',
 }
 
-// ==============================================
-// MAPEAMENTO DE PRODUTO -> CURSO (SLUG)
-// ==============================================
 const PRODUCT_TO_COURSE: Record<string, string> = {
   'codigo_reconquista': 'codigo-reconquista',
   'codigo-reconquista': 'codigo-reconquista',
@@ -34,16 +30,17 @@ const PRODUCT_TO_COURSE: Record<string, string> = {
   'deusa-vip': 'deusa-na-cama',
   'deusa_essencial': 'deusa-na-cama',
   'deusa-essencial': 'deusa-na-cama',
+  'deusa-na-cama': 'deusa-na-cama',
   'exclusivo_1': 'exclusivo-1-porcento',
   'exclusivo-1': 'exclusivo-1-porcento',
   'exclusivo_1_essencial': 'exclusivo-1-porcento',
   'exclusivo-1-essencial': 'exclusivo-1-porcento',
+  'exclusivo-1-porcento': 'exclusivo-1-porcento',
   'santuario': 'santuario',
 }
 
 function identifyProductByName(productName: string): { slug: string; standardName: string } {
   const name = productName.toLowerCase()
-  
   if (name.includes('codigo') || name.includes('reconquista')) {
     return { slug: 'codigo-reconquista', standardName: 'O Codigo da Reconquista - Programa Completo' }
   }
@@ -62,7 +59,6 @@ function identifyProductByName(productName: string): { slug: string; standardNam
   if (name.includes('santuario') || name.includes('santuário')) {
     return { slug: 'santuario', standardName: 'O Santuario' }
   }
-  
   return { slug: 'codigo-reconquista', standardName: productName }
 }
 
@@ -94,7 +90,6 @@ serve(async (req) => {
 
     console.log('[Lojou] Email:', email)
     console.log('[Lojou] Produto ID:', lojouProductId)
-    console.log('[Lojou] Produto Nome:', originalProductName)
 
     if (!email) {
       return new Response(
@@ -125,47 +120,93 @@ serve(async (req) => {
 
     let courseSlug = PRODUCT_TO_COURSE[lojouProductId]
     let standardizedName = PRODUCT_MAP[lojouProductId]
-    
+
     if (!courseSlug || !standardizedName) {
       const identified = identifyProductByName(originalProductName)
       courseSlug = courseSlug || identified.slug
       standardizedName = standardizedName || identified.standardName
     }
-    
+
     console.log('[Lojou] Curso:', courseSlug)
 
-    // BUSCAR OU CRIAR USUARIO
+    // ==============================================
+    // BUSCAR USUARIO DIRETO NA TABELA auth.users
+    // ==============================================
     let userId: string | null = null
+    let isNewUser = false
 
-    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    const existingUser = authUsers?.users?.find(u => u.email?.toLowerCase() === email)
+    console.log('[Lojou] Buscando usuario na tabela auth.users...')
     
+    const { data: existingUser, error: searchError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email')
+      .eq('email', email)
+      .maybeSingle()
+
     if (existingUser) {
       userId = existingUser.id
-      console.log('[Lojou] Usuario encontrado:', userId)
+      isNewUser = false
+      console.log('[Lojou] Usuario EXISTENTE encontrado via profiles:', userId)
     } else {
+      // Tentar buscar direto no auth.users usando RPC ou criar novo
+      console.log('[Lojou] Nao encontrado em profiles, tentando criar...')
+      
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: email,
         email_confirm: true,
         user_metadata: { full_name: name, whatsapp: whatsapp, source: 'lojou_payment' }
       })
 
-      if (createError) {
-        if (createError.message.includes('already') || createError.message.includes('exists')) {
-          const { data: retryUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-          const retryUser = retryUsers?.users?.find(u => u.email?.toLowerCase() === email)
-          if (retryUser) userId = retryUser.id
-        }
-        if (!userId) throw new Error('Falha ao criar usuario: ' + createError.message)
-      } else if (newUser?.user) {
+      if (newUser?.user) {
         userId = newUser.user.id
-        console.log('[Lojou] Usuario criado:', userId)
+        isNewUser = true
+        console.log('[Lojou] Usuario NOVO criado:', userId)
+      } else if (createError) {
+        console.log('[Lojou] Erro ao criar:', createError.message)
+        
+        // Se erro é "já existe", buscar pelo auth.users diretamente
+        if (createError.message.includes('already') || createError.message.includes('exists') || createError.message.includes('registered')) {
+          console.log('[Lojou] Usuario ja existe no Auth, buscando ID...')
+          
+          // Buscar na tabela auth.users diretamente (requer service_role)
+          const { data: authUser } = await supabaseAdmin
+            .rpc('get_user_id_by_email', { user_email: email })
+          
+          if (authUser) {
+            userId = authUser
+            isNewUser = false
+            console.log('[Lojou] Usuario encontrado via RPC:', userId)
+          } else {
+            // Ultima tentativa: buscar via SQL direto
+            const { data: directUser } = await supabaseAdmin
+              .from('auth_users_view')
+              .select('id')
+              .eq('email', email)
+              .maybeSingle()
+            
+            if (directUser) {
+              userId = directUser.id
+              isNewUser = false
+              console.log('[Lojou] Usuario encontrado via view:', userId)
+            }
+          }
+        }
+        
+        if (!userId) {
+          throw new Error('Nao foi possivel criar ou encontrar o usuario: ' + createError.message)
+        }
       }
     }
 
-    if (!userId) throw new Error('Impossivel obter ID do usuario')
+    if (!userId) {
+      throw new Error('Impossivel obter ID do usuario')
+    }
 
-    // SINCRONIZAR PROFILE - SEM has_full_access = true
+    console.log('[Lojou] User ID final:', userId, '| Novo:', isNewUser)
+
+    // ==============================================
+    // SINCRONIZAR PROFILE
+    // ==============================================
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -182,6 +223,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)
+      console.log('[Lojou] Profile atualizado')
     } else {
       await supabaseAdmin
         .from('profiles')
@@ -194,29 +236,50 @@ serve(async (req) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
+      console.log('[Lojou] Profile criado')
     }
 
-    // REGISTRAR COMPRA
-    const { data: purchaseData } = await supabaseAdmin
+    // ==============================================
+    // VERIFICAR COMPRA DUPLICADA
+    // ==============================================
+    const { data: existingPurchase } = await supabaseAdmin
       .from('purchases')
-      .insert({
-        user_id: userId,
-        product_name: originalProductName,
-        lojou_product_name: standardizedName,
-        lojou_transaction_id: String(transactionId),
-        amount: Number(amount),
-        fee: Number(fee),
-        status: 'active',
-        customer_email: email,
-        customer_name: name,
-        customer_whatsapp: whatsapp,
-        raw_payload: payload,
-        created_at: new Date().toISOString()
-      })
       .select('id')
-      .single()
+      .eq('user_id', userId)
+      .eq('lojou_transaction_id', String(transactionId))
+      .maybeSingle()
 
-    // CONCEDER ACESSO AO CURSO ESPECIFICO
+    let purchaseId = existingPurchase?.id
+
+    if (!existingPurchase) {
+      const { data: purchaseData } = await supabaseAdmin
+        .from('purchases')
+        .insert({
+          user_id: userId,
+          product_name: originalProductName,
+          lojou_product_name: standardizedName,
+          lojou_transaction_id: String(transactionId),
+          amount: Number(amount),
+          fee: Number(fee),
+          status: 'active',
+          customer_email: email,
+          customer_name: name,
+          customer_whatsapp: whatsapp,
+          raw_payload: payload,
+          created_at: new Date().toISOString()
+        })
+        .select('id')
+        .single()
+      
+      purchaseId = purchaseData?.id
+      console.log('[Lojou] Compra registrada:', purchaseId)
+    } else {
+      console.log('[Lojou] Compra duplicada ignorada')
+    }
+
+    // ==============================================
+    // CONCEDER ACESSO AO CURSO
+    // ==============================================
     const { data: courseData } = await supabaseAdmin
       .from('courses')
       .select('id, name')
@@ -224,19 +287,34 @@ serve(async (req) => {
       .eq('is_active', true)
       .single()
 
+    let courseAccessGranted = false
+
     if (courseData?.id) {
-      await supabaseAdmin
+      const { data: existingAccess } = await supabaseAdmin
         .from('user_courses')
-        .upsert({
-          user_id: userId,
-          course_id: courseData.id,
-          purchase_id: purchaseData?.id
-        }, { onConflict: 'user_id,course_id' })
-      
-      console.log('[Lojou] Acesso concedido:', courseData.name)
+        .select('id')
+        .eq('user_id', userId)
+        .eq('course_id', courseData.id)
+        .maybeSingle()
+
+      if (!existingAccess) {
+        await supabaseAdmin
+          .from('user_courses')
+          .insert({
+            user_id: userId,
+            course_id: courseData.id,
+            purchase_id: purchaseId
+          })
+        console.log('[Lojou] Acesso concedido:', courseData.name)
+      } else {
+        console.log('[Lojou] Usuario ja tinha acesso')
+      }
+      courseAccessGranted = true
     }
 
-    // CRIAR MAGIC LINK
+    // ==============================================
+    // MAGIC LINK
+    // ==============================================
     const token = crypto.randomUUID() + '-' + Date.now().toString(36)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
@@ -250,7 +328,9 @@ serve(async (req) => {
         product_name: standardizedName
       })
 
+    // ==============================================
     // ENVIAR EMAIL
+    // ==============================================
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const SITE_URL = Deno.env.get('SITE_URL') || 'https://areademembrocodigodareconquista-nine.vercel.app'
     const magicLink = `${SITE_URL}/auto-login?token=${token}`
@@ -281,6 +361,7 @@ serve(async (req) => {
           `
         })
       })
+      console.log('[Lojou] Email enviado')
     }
 
     console.log('[Lojou] ========== SUCESSO ==========')
@@ -290,10 +371,11 @@ serve(async (req) => {
         success: true,
         user_id: userId,
         email: email,
+        is_new_user: isNewUser,
         product: standardizedName,
         course: courseSlug,
         magic_link_created: true,
-        course_access_granted: true
+        course_access_granted: courseAccessGranted
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
