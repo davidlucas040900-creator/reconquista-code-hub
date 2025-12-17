@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserAccess } from '@/hooks/useUserAccess';
@@ -67,46 +67,22 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
   // Hook de drip content
   const { isModuleAccessible, isLessonAccessible } = useUserDripAccess(user?.id);
 
-  // Extrair todos os módulos com info de acesso
-  const allModulesWithAccess = useMemo(() => {
+  // Extrair TODOS os módulos (sem filtrar) - apenas adiciona info de acesso
+  const allModules = useMemo(() => {
     const modules = courses.flatMap(course =>
-      (course.course_modules || []).map(module => {
-        // Verificar acesso de compra
-        const hasCourseAccess = accessData?.hasFullAccess || accessData?.purchasedCourses?.includes(course.slug);
-
-        // Verificar drip do módulo
-        const moduleAccess = isModuleAccessible(module.id);
-        const isModuleLocked = hasCourseAccess && !moduleAccess.accessible;
-
-        // Verificar primeira aula
-        const firstLesson = module.course_lessons?.[0];
-        let isFirstLessonLocked = false;
-
-        if (firstLesson && hasCourseAccess) {
-          const lessonAccess = isLessonAccessible(firstLesson.id, module.id);
-          isFirstLessonLocked = !lessonAccess.accessible;
-        }
-
-        return {
-          ...module,
-          courseSlug: course.slug,
-          courseName: course.name,
-          hasCourseAccess,
-          isModuleLocked,
-          isFirstLessonLocked,
-          releaseDate: moduleAccess.releaseDate,
-        };
-      })
+      (course.course_modules || []).map(module => ({
+        ...module,
+        courseSlug: course.slug,
+        courseName: course.name,
+      }))
     );
-
-    // Filtrar apenas módulos acessíveis (não bloqueados por drip)
-    // OU mostrar todos mas marcar os bloqueados
-    return shuffleArray(modules.filter(m => !m.isModuleLocked && !m.isFirstLessonLocked));
-  }, [courses, accessData, isModuleAccessible, isLessonAccessible]);
+    // Embaralhar mas NÃO filtrar
+    return shuffleArray(modules);
+  }, [courses]);
 
   // Auto-scroll
   useEffect(() => {
-    if (allModulesWithAccess.length <= 1) return;
+    if (allModules.length <= 1) return;
 
     const interval = setInterval(() => {
       if (!isTransitioning) {
@@ -115,19 +91,19 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     }, 6000);
 
     return () => clearInterval(interval);
-  }, [allModulesWithAccess.length, isTransitioning]);
+  }, [allModules.length, isTransitioning]);
 
   const goToPrevious = () => {
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setCurrentIndex((prev) => (prev - 1 + allModulesWithAccess.length) % allModulesWithAccess.length);
+    setCurrentIndex((prev) => (prev - 1 + allModules.length) % allModules.length);
     setTimeout(() => setIsTransitioning(false), 700);
   };
 
   const goToNext = () => {
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setCurrentIndex((prev) => (prev + 1) % allModulesWithAccess.length);
+    setCurrentIndex((prev) => (prev + 1) % allModules.length);
     setTimeout(() => setIsTransitioning(false), 700);
   };
 
@@ -148,7 +124,7 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     }
   };
 
-  if (!allModulesWithAccess.length) {
+  if (!allModules.length) {
     return (
       <section className="relative h-[70vh] md:h-[80vh] bg-gradient-to-b from-purple-900/20 to-noir-950 flex items-center justify-center">
         <p className="text-gray-400">Nenhum módulo disponível</p>
@@ -156,23 +132,40 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
     );
   }
 
-  const currentModule = allModulesWithAccess[currentIndex];
+  const currentModule = allModules[currentIndex];
+  const hasAccess = accessData?.hasFullAccess || accessData?.purchasedCourses?.includes(currentModule.courseSlug);
   const firstLesson = currentModule.course_lessons?.[0];
 
   const handleClick = () => {
-    if (currentModule.hasCourseAccess && firstLesson) {
-      // Verificar drip antes de navegar
-      const lessonAccess = isLessonAccessible(firstLesson.id, currentModule.id);
+    // Se não tem acesso ao curso  checkout
+    if (!hasAccess) {
+      window.open(checkoutLinks[currentModule.courseSlug] || 'https://pay.lojou.app/p/qp5Vp', '_blank');
+      return;
+    }
 
+    // Tem acesso ao curso  verificar drip do módulo
+    const moduleAccess = isModuleAccessible(currentModule.id);
+    
+    if (!moduleAccess.accessible) {
+      // Módulo bloqueado por drip  ir para página do curso
+      navigate(`/curso/${currentModule.courseSlug}`);
+      return;
+    }
+
+    // Módulo acessível  verificar drip da primeira aula
+    if (firstLesson) {
+      const lessonAccess = isLessonAccessible(firstLesson.id, currentModule.id);
+      
       if (lessonAccess.accessible) {
+        // Aula acessível  ir para aula
         navigate(`/aula/${firstLesson.id}`);
       } else {
-        // Aula bloqueada por drip - ir para página do curso
+        // Aula bloqueada  ir para página do curso
         navigate(`/curso/${currentModule.courseSlug}`);
       }
     } else {
-      // Não tem acesso - abrir checkout
-      window.open(checkoutLinks[currentModule.courseSlug] || 'https://pay.lojou.app/p/qp5Vp', '_blank');
+      // Sem aulas  ir para página do curso
+      navigate(`/curso/${currentModule.courseSlug}`);
     }
   };
 
@@ -217,7 +210,7 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
       </div>
 
       {/* Navigation Arrows - Desktop */}
-      {allModulesWithAccess.length > 1 && (
+      {allModules.length > 1 && (
         <>
           <button
             onClick={goToPrevious}
@@ -235,9 +228,9 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
       )}
 
       {/* Dots Indicator */}
-      {allModulesWithAccess.length > 1 && (
+      {allModules.length > 1 && (
         <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2">
-          {allModulesWithAccess.slice(0, 10).map((_, index) => (
+          {allModules.slice(0, 10).map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
@@ -248,8 +241,8 @@ export function HeroCarousel({ courses }: HeroCarouselProps) {
               }`}
             />
           ))}
-          {allModulesWithAccess.length > 10 && (
-            <span className="text-white/40 text-xs ml-2">+{allModulesWithAccess.length - 10}</span>
+          {allModules.length > 10 && (
+            <span className="text-white/40 text-xs ml-2">+{allModules.length - 10}</span>
           )}
         </div>
       )}
