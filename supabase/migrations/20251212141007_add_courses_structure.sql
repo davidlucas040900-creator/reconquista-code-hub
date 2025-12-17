@@ -1,4 +1,4 @@
-﻿-- =====================================================
+-- =====================================================
 -- MIGRATION: Estrutura Completa de Cursos
 -- Adiciona tabelas para gerenciar cursos via Admin
 -- =====================================================
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.courses (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. TABELA DE MÓDULOS DO CURSO
+-- 2. TABELA DE MÃƒâ€œDULOS DO CURSO
 -- =====================================================
 CREATE TABLE IF NOT EXISTS public.course_modules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS public.user_lesson_progress (
 );
 
 -- =====================================================
--- ÍNDICES PARA PERFORMANCE
+-- ÃƒÂNDICES PARA PERFORMANCE
 -- =====================================================
 CREATE INDEX IF NOT EXISTS idx_course_modules_course ON public.course_modules(course_id);
 CREATE INDEX IF NOT EXISTS idx_course_lessons_module ON public.course_lessons(module_id);
@@ -88,7 +88,7 @@ CREATE POLICY "Anyone can view active courses" ON public.courses
 CREATE POLICY "Admins can manage courses" ON public.courses
   FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
--- Modules: todos podem ver módulos ativos
+-- Modules: todos podem ver mÃƒÂ³dulos ativos
 CREATE POLICY "Anyone can view active modules" ON public.course_modules
   FOR SELECT USING (is_active = true);
 
@@ -102,7 +102,7 @@ CREATE POLICY "Anyone can view active lessons" ON public.course_lessons
 CREATE POLICY "Admins can manage lessons" ON public.course_lessons
   FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
--- User Progress: usuário vê apenas seu progresso
+-- User Progress: usuÃƒÂ¡rio vÃƒÂª apenas seu progresso
 CREATE POLICY "Users view own progress" ON public.user_lesson_progress
   FOR SELECT USING (auth.uid() = user_id);
 
@@ -116,25 +116,28 @@ CREATE POLICY "Users update own progress" ON public.user_lesson_progress
 -- TRIGGERS
 -- =====================================================
 
+DROP TRIGGER IF EXISTS update_courses_updated_at ON public.courses;
 CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON public.courses
-FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+DROP TRIGGER IF EXISTS update_course_modules_updated_at ON public.course_modules;
 CREATE TRIGGER update_course_modules_updated_at BEFORE UPDATE ON public.course_modules
-FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+DROP TRIGGER IF EXISTS update_course_lessons_updated_at ON public.course_lessons;
 CREATE TRIGGER update_course_lessons_updated_at BEFORE UPDATE ON public.course_lessons
-FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
 -- =====================================================
 -- INSERIR CURSOS INICIAIS
 -- =====================================================
 
--- Curso 1: O Código da Reconquista
+-- Curso 1: O CÃƒÂ³digo da Reconquista
 INSERT INTO public.courses (name, slug, description, thumbnail, price, order_index)
 VALUES (
-  'O Código da Reconquista',
+  'O CÃƒÂ³digo da Reconquista',
   'codigo-reconquista',
-  'Curso completo de reconquista amorosa com estratégias comprovadas.',
+  'Curso completo de reconquista amorosa com estratÃƒÂ©gias comprovadas.',
   'https://pub-335435355c6548d7987945a540eca66b.r2.dev/MODULO%201.webp',
   197.00,
   1
@@ -145,7 +148,7 @@ INSERT INTO public.courses (name, slug, description, thumbnail, price, order_ind
 VALUES (
   'A Deusa na Cama',
   'deusa-na-cama',
-  'Módulo premium de sedução avançada com técnicas secretas que transformam momentos íntimos em experiências inesquecíveis.',
+  'MÃƒÂ³dulo premium de seduÃƒÂ§ÃƒÂ£o avanÃƒÂ§ada com tÃƒÂ©cnicas secretas que transformam momentos ÃƒÂ­ntimos em experiÃƒÂªncias inesquecÃƒÂ­veis.',
   'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800',
   597.00,
   2
