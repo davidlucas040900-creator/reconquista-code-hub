@@ -6,19 +6,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserProgress } from '@/hooks/useUserProgress';
 import { useUserAccess } from '@/hooks/useUserAccess';
+import { useUserDripAccess } from '@/hooks/useAdminDripContent';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ChevronLeft, 
-  ChevronDown, 
-  ChevronRight, 
-  PlayCircle, 
+import {
+  ChevronLeft,
+  ChevronDown,
+  ChevronRight,
+  PlayCircle,
   CheckCircle,
   Circle,
-  Loader2, 
+  Loader2,
   Lock,
   Clock,
-  BookOpen
+  BookOpen,
+  Calendar
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -27,14 +29,22 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 const checkoutLinks: Record<string, string> = {
   'codigo-reconquista': 'https://pay.lojou.app/p/qp5Vp',
   'deusa-na-cama': 'https://pay.lojou.app/p/pKPr7',
-  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',};
+  'exclusivo-1-porcento': 'https://pay.lojou.app/p/qp5Vp',
+};
+
+interface Lesson {
+  id: string;
+  title: string;
+  is_bonus: boolean;
+  duration_minutes: number;
+}
 
 interface Module {
   id: string;
   name: string;
   description: string;
   thumbnail: string;
-  lessons: { id: string; title: string; is_bonus: boolean; duration_minutes: number }[];
+  lessons: Lesson[];
 }
 
 interface Course {
@@ -52,6 +62,9 @@ export default function CursoDetalhe() {
   const { data: userProgress } = useUserProgress();
   const { data: accessData } = useUserAccess();
   
+  // Hook de drip content
+  const { isModuleAccessible, isLessonAccessible } = useUserDripAccess(user?.id);
+
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
@@ -63,7 +76,7 @@ export default function CursoDetalhe() {
   // Auto-scroll do carrossel de capas dos módulos
   useEffect(() => {
     if (modules.length <= 1) return;
-    
+
     const interval = setInterval(() => {
       setCarouselIndex((prev) => (prev + 1) % modules.length);
     }, 4000);
@@ -143,7 +156,7 @@ export default function CursoDetalhe() {
   };
 
   const getTotalDuration = () => {
-    const totalMinutes = modules.reduce((acc, mod) => 
+    const totalMinutes = modules.reduce((acc, mod) =>
       acc + mod.lessons.reduce((a, l) => a + (l.duration_minutes || 0), 0), 0
     );
     const hours = Math.floor(totalMinutes / 60);
@@ -153,6 +166,14 @@ export default function CursoDetalhe() {
 
   const getTotalLessons = () => {
     return modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
+  };
+
+  // Formatar data para exibição
+  const formatReleaseDate = (dateStr: string) => {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+    });
   };
 
   // Imagem atual do carrossel (capa do módulo)
@@ -168,15 +189,14 @@ export default function CursoDetalhe() {
 
   return (
     <div className="min-h-screen bg-noir-950">
-      {/* Hero Section - APENAS imagem do carrossel mudou */}
+      {/* Hero Section */}
       <div className="relative h-[40vh] md:h-[50vh] overflow-hidden">
-        {/* Background - Agora usa as capas dos módulos em carrossel */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out"
           style={{
             backgroundImage: currentModuleThumbnail
               ? `url(${currentModuleThumbnail})`
-              : course?.thumbnail 
+              : course?.thumbnail
                 ? `url(${course.thumbnail})`
                 : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
           }}
@@ -206,7 +226,7 @@ export default function CursoDetalhe() {
             <p className="text-gray-300 text-sm md:text-base mb-4 max-w-2xl">
               {course?.description || 'Transforme sua vida com este curso exclusivo.'}
             </p>
-            
+
             {/* Stats */}
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-2 text-gray-300">
@@ -226,22 +246,40 @@ export default function CursoDetalhe() {
         </div>
       </div>
 
-      {/* Modules List - INALTERADO */}
+      {/* Modules List */}
       <main className="px-4 md:px-8 py-6 md:py-8 max-w-4xl mx-auto">
         <div className="space-y-3">
           {modules.map((mod, modIndex) => {
             const progress = getModuleProgress(mod);
             const isComplete = progress === 100;
+            
+            // Verificar acesso do módulo via drip
+            const moduleAccess = isModuleAccessible(mod.id);
+            const isModuleLocked = hasAccess && !moduleAccess.accessible;
 
             return (
-              <div 
-                key={mod.id} 
-                className="overflow-hidden rounded-xl border border-white/10 bg-noir-900/50 backdrop-blur-sm"
+              <div
+                key={mod.id}
+                className={`overflow-hidden rounded-xl border bg-noir-900/50 backdrop-blur-sm ${
+                  isModuleLocked 
+                    ? 'border-yellow-500/30' 
+                    : 'border-white/10'
+                }`}
               >
-                <Collapsible open={expandedModules.has(mod.id)} onOpenChange={() => toggleModule(mod.id)}>
-                  <CollapsibleTrigger className="w-full p-4 md:p-5 text-left flex items-center gap-4 hover:bg-white/5 transition-colors">
+                <Collapsible 
+                  open={expandedModules.has(mod.id) && !isModuleLocked} 
+                  onOpenChange={() => !isModuleLocked && toggleModule(mod.id)}
+                >
+                  <CollapsibleTrigger 
+                    className={`w-full p-4 md:p-5 text-left flex items-center gap-4 transition-colors ${
+                      isModuleLocked 
+                        ? 'cursor-not-allowed opacity-80' 
+                        : 'hover:bg-white/5'
+                    }`}
+                    disabled={isModuleLocked}
+                  >
                     {/* Module Thumbnail */}
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+                    <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                       {mod.thumbnail ? (
                         <img src={mod.thumbnail} alt={mod.name} className="w-full h-full object-cover" />
                       ) : (
@@ -249,22 +287,41 @@ export default function CursoDetalhe() {
                           <span className="text-xl font-bold text-purple-400/50">{modIndex + 1}</span>
                         </div>
                       )}
+                      
+                      {/* Overlay de bloqueio no thumbnail */}
+                      {isModuleLocked && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <Lock className="w-6 h-6 text-yellow-500" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Module Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        {isComplete && (
+                        {isComplete && !isModuleLocked && (
                           <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        )}
+                        {isModuleLocked && (
+                          <Lock className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                         )}
                         <h3 className="font-semibold text-white text-sm md:text-base truncate">
                           {mod.name}
                         </h3>
                       </div>
-                      <p className="text-gray-400 text-xs md:text-sm mb-2">
-                        {mod.lessons.length} aulas
-                      </p>
-                      {progress > 0 && (
+                      
+                      {isModuleLocked && moduleAccess.releaseDate ? (
+                        <div className="flex items-center gap-1 text-yellow-500 text-xs md:text-sm">
+                          <Calendar className="w-3 h-3" />
+                          <span>Libera em {formatReleaseDate(moduleAccess.releaseDate)}</span>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-xs md:text-sm mb-2">
+                          {mod.lessons.length} aulas
+                        </p>
+                      )}
+                      
+                      {progress > 0 && !isModuleLocked && (
                         <div className="flex items-center gap-2">
                           <Progress value={progress} className="h-1.5 flex-1" />
                           <span className="text-xs text-gold font-medium">{progress}%</span>
@@ -274,7 +331,11 @@ export default function CursoDetalhe() {
 
                     {/* Expand Icon */}
                     <div className="flex-shrink-0">
-                      {expandedModules.has(mod.id) ? (
+                      {isModuleLocked ? (
+                        <div className="px-2 py-1 bg-yellow-500/10 rounded text-yellow-500 text-xs">
+                          BLOQUEADO
+                        </div>
+                      ) : expandedModules.has(mod.id) ? (
                         <ChevronDown className="w-5 h-5 text-gray-400" />
                       ) : (
                         <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -286,20 +347,27 @@ export default function CursoDetalhe() {
                     <div className="border-t border-white/5 bg-black/20">
                       {mod.lessons.map((lesson, i) => {
                         const completed = isLessonCompleted(lesson.id);
+                        
+                        // Verificar acesso da aula via drip
+                        const lessonAccess = isLessonAccessible(lesson.id, mod.id);
+                        const isLessonLocked = hasAccess && !lessonAccess.accessible;
+                        
+                        // Aula bloqueada se: não tem acesso OU drip não liberou
+                        const cantAccess = !hasAccess || isLessonLocked;
 
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => hasAccess ? navigate(`/aula/${lesson.id}`) : null}
-                            disabled={!hasAccess}
-                            className={`w-full flex items-center gap-4 px-4 md:px-5 py-3 md:py-4 text-left border-b border-white/5 last:border-0 transition-colors ${
-                              hasAccess ? 'hover:bg-white/5' : 'opacity-50 cursor-not-allowed'
+                            onClick={() => !cantAccess && navigate(`/aula/${lesson.id}`)}
+                            disabled={cantAccess}
+                            className={`w-full flex items-center gap-4 px-4 md:px-5 py-3 md:py-4 text-left border-b border-white/5 last:border-0 transition-colors ${      
+                              cantAccess ? 'opacity-60 cursor-not-allowed' : 'hover:bg-white/5'
                             }`}
                           >
                             {/* Status Icon */}
                             <div className="flex-shrink-0">
-                              {!hasAccess ? (
-                                <Lock className="w-4 h-4 text-gray-500" />
+                              {!hasAccess || isLessonLocked ? (
+                                <Lock className={`w-4 h-4 ${isLessonLocked ? 'text-yellow-500' : 'text-gray-500'}`} />
                               ) : completed ? (
                                 <CheckCircle className="w-4 h-4 text-green-500" />
                               ) : (
@@ -318,6 +386,12 @@ export default function CursoDetalhe() {
                                     BÔNUS
                                   </span>
                                 )}
+                                {isLessonLocked && lessonAccess.releaseDate && (
+                                  <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {formatReleaseDate(lessonAccess.releaseDate)}
+                                  </span>
+                                )}
                               </div>
                               <p className={`text-sm ${completed ? 'text-gray-400' : 'text-white'}`}>
                                 {lesson.title}
@@ -332,7 +406,7 @@ export default function CursoDetalhe() {
                             )}
 
                             {/* Play Icon */}
-                            {hasAccess && (
+                            {!cantAccess && (
                               <PlayCircle className="w-4 h-4 text-gray-500 flex-shrink-0" />
                             )}
                           </button>
@@ -346,7 +420,7 @@ export default function CursoDetalhe() {
           })}
         </div>
 
-        {/* CTA para não assinantes - INALTERADO */}
+        {/* CTA para não assinantes */}
         {!hasAccess && (
           <div className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-gold/20 to-purple-500/20 border border-gold/30 text-center">
             <Lock className="w-10 h-10 text-gold mx-auto mb-3" />
@@ -366,19 +440,14 @@ export default function CursoDetalhe() {
         )}
       </main>
 
-      {/* Footer - INALTERADO */}
+      {/* Footer */}
       <footer className="border-t border-white/5 bg-noir-900/30">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <p className="text-center text-xs text-gray-500">
-             2024 Reconquista. Todos os direitos reservados.
+            © 2025 Reconquista. Todos os direitos reservados.
           </p>
         </div>
       </footer>
     </div>
   );
 }
-
-
-
-
-
