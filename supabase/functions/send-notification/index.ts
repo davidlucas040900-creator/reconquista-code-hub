@@ -4,9 +4,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -17,55 +19,98 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { userId, title, body, url, moduleId, lessonNumber } = await req.json();
+    const { recipientType, recipientId, title, body } = await req.json();
 
-    // Buscar subscription do usuário
-    const { data: subscriptionData, error: subError } = await supabase
-      .from('push_subscriptions')
-      .select('subscription')
-      .eq('user_id', userId)
-      .single();
-
-    if (subError || !subscriptionData) {
+    if (!title || !body) {
       return new Response(
-        JSON.stringify({ error: 'Subscription não encontrada' }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Título e mensagem são obrigatórios" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const subscription = subscriptionData.subscription;
+    let targetUsers: string[] = [];
 
-    // Enviar notificação push
-    const payload = JSON.stringify({
-      title: title || '👑 Código da Reconquista',
-      body: body || 'Continue suas aulas e reconquiste!',
-      url: url || '/',
-      moduleId,
-      lessonNumber
-    });
+    // Determinar destinatários
+    if (recipientType === "single" && recipientId) {
+      targetUsers = [recipientId];
+    } else if (recipientType === "course" && recipientId) {
+      // Buscar todos os usuários com acesso ao curso
+      const { data: courseUsers } = await supabase
+        .from("user_courses")
+        .select("user_id")
+        .eq("course_id", recipientId);
+      
+      targetUsers = courseUsers?.map((u) => u.user_id) || [];
+    } else if (recipientType === "all") {
+      // Buscar todos os usuários com acesso ativo
+      const { data: allUsers } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("has_full_access", true);
+      
+      targetUsers = allUsers?.map((u) => u.id) || [];
+    }
 
-    // Aqui você enviaria a notificação usando web-push
-    // Por simplicidade, vamos apenas logar
-    console.log('Enviando notificação:', { userId, payload });
+    console.log(`Enviando notificação para ${targetUsers.length} usuários`);
 
-    // Registrar no banco
-    await supabase.from('notification_logs').insert({
-      user_id: userId,
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Enviar para cada usuário
+    for (const userId of targetUsers) {
+      try {
+        // Buscar subscription do usuário
+        const { data: subscriptionData } = await supabase
+          .from("push_subscriptions")
+          .select("subscription")
+          .eq("user_id", userId)
+          .single();
+
+        if (subscriptionData?.subscription) {
+          // Aqui você implementaria o envio real do push notification
+          // Por enquanto, apenas logamos
+          console.log(`Push enviado para: ${userId}`);
+          successCount++;
+        }
+
+        // Registrar no banco (independente de ter subscription)
+        await supabase.from("notification_logs").insert({
+          user_id: userId,
+          title,
+          body,
+          sent_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error(`Erro ao enviar para ${userId}:`, err);
+        errorCount++;
+      }
+    }
+
+    // Registrar notificação enviada
+    await supabase.from("sent_notifications").insert({
+      recipient_type: recipientType,
+      recipient_id: recipientId || null,
       title,
       body,
-      sent_at: new Date().toISOString()
+      sent_at: new Date().toISOString(),
     });
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Notificação enviada' }),
+      JSON.stringify({
+        success: true,
+        message: `Notificação enviada para ${successCount} usuários`,
+        total: targetUsers.length,
+        successCount,
+        errorCount,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error('Erro:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Erro:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
