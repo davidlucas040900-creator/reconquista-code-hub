@@ -1,23 +1,26 @@
-// src/components/admin/AdminLayout.tsx
+﻿// src/components/admin/AdminLayout.tsx
 
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
   Settings,
   LogOut,
   ChevronRight,
-  Loader2
+  Loader2,
+  Bell,
+  FileText,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  title: string;
+  title?: string;
   breadcrumb?: { label: string; href?: string }[];
 }
 
@@ -25,7 +28,10 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/cursos', label: 'Cursos', icon: BookOpen },
   { href: '/admin/alunos', label: 'Alunos', icon: Users },
-  { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
+  { href: '/admin/materiais', label: 'Materiais', icon: FileText },
+  { href: '/admin/notificacoes', label: 'Notificacoes', icon: Bell },
+  { href: '/admin/drip-content', label: 'Drip Content', icon: Clock },
+  { href: '/admin/configuracoes', label: 'Configuracoes', icon: Settings },
 ];
 
 export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
@@ -50,7 +56,7 @@ export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
         <h1 className="text-2xl font-semibold text-foreground mb-2">Acesso Negado</h1>
-        <p className="text-muted-foreground mb-6">Você não tem permissão para acessar esta área.</p>
+        <p className="text-muted-foreground mb-6">Voce nao tem permissao para acessar esta area.</p>
         <Button onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
       </div>
     );
@@ -63,7 +69,7 @@ export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
         <div className="flex h-14 items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">
             <Link to="/admin" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background text-sm font-bold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500 text-black text-sm font-bold">
                 CR
               </div>
               <span className="font-semibold text-foreground hidden sm:inline">Admin</span>
@@ -83,19 +89,19 @@ export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
 
       <div className="flex">
         {/* Sidebar */}
-        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-56 shrink-0 border-r border-border lg:block">
+        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-56 shrink-0 border-r border-border lg:block overflow-y-auto">
           <nav className="flex flex-col gap-1 p-4">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.href || 
+              const isActive = location.pathname === item.href ||
                 (item.href !== '/admin' && location.pathname.startsWith(item.href));
-              
+
               return (
                 <Link
                   key={item.href}
                   to={item.href}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-accent text-accent-foreground'
+                      ? 'bg-amber-500/10 text-amber-500'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
                 >
@@ -107,8 +113,31 @@ export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
           </nav>
         </aside>
 
+        {/* Mobile Bottom Nav */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background lg:hidden">
+          <div className="flex justify-around py-2">
+            {navItems.slice(0, 5).map((item) => {
+              const isActive = location.pathname === item.href ||
+                (item.href !== '/admin' && location.pathname.startsWith(item.href));
+
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={`flex flex-col items-center gap-1 px-3 py-1 text-xs ${
+                    isActive ? 'text-amber-500' : 'text-muted-foreground'
+                  }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label.split(' ')[0]}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0">
           <div className="p-4 lg:p-6">
             {/* Breadcrumb */}
             {breadcrumb && breadcrumb.length > 0 && (
@@ -128,7 +157,9 @@ export function AdminLayout({ children, title, breadcrumb }: AdminLayoutProps) {
             )}
 
             {/* Page Title */}
-            <h1 className="text-2xl font-semibold text-foreground mb-6">{title}</h1>
+            {title && (
+              <h1 className="text-2xl font-semibold text-foreground mb-6">{title}</h1>
+            )}
 
             {/* Content */}
             {children}

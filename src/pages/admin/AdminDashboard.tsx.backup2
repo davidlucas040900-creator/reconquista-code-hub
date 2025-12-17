@@ -42,8 +42,8 @@ export default function AdminDashboard() {
       const { data, error } = await supabase.rpc('admin_get_dashboard_stats');
 
       if (error) {
-        console.error('Erro ao buscar estatisticas:', error);
-        toast.error('Erro ao carregar estatisticas');
+        console.error('Erro ao buscar estatísticas:', error);
+        toast.error('Erro ao carregar estatísticas');
         return;
       }
 
@@ -70,10 +70,10 @@ export default function AdminDashboard() {
 
   const statCards = [
     {
-      title: 'Total de Usuarios',
+      title: 'Total de Usuários',
       value: stats.total_users,
       icon: Users,
-      description: 'Usuarios cadastrados',
+      description: 'Usuários cadastrados',
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10'
     },
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
       title: 'Cursos Ativos',
       value: stats.total_courses,
       icon: BookOpen,
-      description: 'Cursos disponiveis',
+      description: 'Cursos disponíveis',
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10'
     },
@@ -113,7 +113,7 @@ export default function AdminDashboard() {
       title: 'Acessos Hoje',
       value: stats.today_accesses,
       icon: Clock,
-      description: 'Acessos nas ultimas 24h',
+      description: 'Acessos nas últimas 24h',
       color: 'text-cyan-500',
       bgColor: 'bg-cyan-500/10'
     },
@@ -121,15 +121,15 @@ export default function AdminDashboard() {
       title: 'Compras Ativas',
       value: stats.active_purchases,
       icon: ShoppingBag,
-      description: 'de ' + stats.total_purchases + ' totais',
+      description: `de ${stats.total_purchases} totais`,
       color: 'text-amber-500',
       bgColor: 'bg-amber-500/10'
     },
     {
-      title: 'Taxa de Conclusao',
-      value: stats.completion_rate.toFixed(1) + '%',
+      title: 'Taxa de Conclusão',
+      value: `${stats.completion_rate.toFixed(1)}%`,
       icon: BarChart3,
-      description: 'Progresso medio',
+      description: 'Progresso médio',
       color: 'text-pink-500',
       bgColor: 'bg-pink-500/10'
     }
@@ -143,6 +143,7 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Stats Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {statCards.map((card) => (
               <Card key={card.title} className="bg-zinc-900/50 border-zinc-800">
@@ -150,8 +151,8 @@ export default function AdminDashboard() {
                   <CardTitle className="text-sm font-medium text-gray-400">
                     {card.title}
                   </CardTitle>
-                  <div className={'p-2 rounded-lg ' + card.bgColor}>
-                    <card.icon className={'h-4 w-4 ' + card.color} />
+                  <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                    <card.icon className={`h-4 w-4 ${card.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -162,6 +163,7 @@ export default function AdminDashboard() {
             ))}
           </div>
 
+          {/* Summary Card */}
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
               <CardTitle className="text-white">Resumo da Plataforma</CardTitle>
@@ -171,31 +173,34 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   <span className="text-gray-300">
-                    Sistema operacional com <span className="text-white font-semibold">{stats.total_users}</span> usuarios cadastrados
+                    Sistema operacional com <span className="text-white font-semibold">{stats.total_users}</span> usuários cadastrados
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                   <span className="text-gray-300">
-                    <span className="text-white font-semibold">{stats.active_students}</span> alunos tem acesso a <span className="text-white font-semibold">{stats.total_courses}</span> cursos ativos
+                    <span className="text-white font-semibold">{stats.active_students}</span> alunos têm acesso a{' '}
+                    <span className="text-white font-semibold">{stats.total_courses}</span> cursos ativos
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                   <span className="text-gray-300">
-                    <span className="text-white font-semibold">{stats.total_lessons}</span> aulas disponiveis, <span className="text-white font-semibold">{stats.completed_lessons}</span> ja foram concluidas
+                    <span className="text-white font-semibold">{stats.total_lessons}</span> aulas disponíveis,{' '}
+                    <span className="text-white font-semibold">{stats.completed_lessons}</span> já foram concluídas
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                   <span className="text-gray-300">
-                    <span className="text-white font-semibold">{stats.active_purchases}</span> compras ativas de <span className="text-white font-semibold">{stats.total_purchases}</span> totais
+                    <span className="text-white font-semibold">{stats.active_purchases}</span> compras ativas de{' '}
+                    <span className="text-white font-semibold">{stats.total_purchases}</span> totais
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-pink-500"></div>
                   <span className="text-gray-300">
-                    Taxa de conclusao media: <span className="text-white font-semibold">{stats.completion_rate.toFixed(1)}%</span>
+                    Taxa de conclusão média: <span className="text-white font-semibold">{stats.completion_rate.toFixed(1)}%</span>
                   </span>
                 </div>
               </div>

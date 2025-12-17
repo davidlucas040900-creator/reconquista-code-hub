@@ -29,6 +29,8 @@ import AdminCursoDetalhe from './pages/admin/AdminCursoDetalhe';
 import AdminAlunos from './pages/admin/AdminAlunos';
 import AdminConfiguracoes from './pages/admin/AdminConfiguracoes';
 import AdminNotificacoes from './pages/admin/AdminNotificacoes';
+import AdminMateriais from './pages/admin/AdminMateriais';
+import AdminDripContent from './pages/admin/AdminDripContent';
 
 // Outras paginas
 import TestPlyr from './pages/TestPlyr';
@@ -58,31 +60,31 @@ const App = () => (
                   <Dashboard />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/cursos" element={
                 <ProtectedRoute>
                   <Cursos />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/curso/:courseSlug" element={
                 <ProtectedRoute>
                   <CursoDetalhe />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/aula/:lessonId" element={
                 <ProtectedRoute>
                   <Aula />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/perfil" element={
                 <ProtectedRoute>
                   <Perfil />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/materiais" element={
                 <ProtectedRoute>
                   <Materiais />
@@ -95,52 +97,46 @@ const App = () => (
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/cursos" element={
                 <ProtectedRoute requiresAdmin>
                   <AdminCursos />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/cursos/:courseId" element={
                 <ProtectedRoute requiresAdmin>
                   <AdminCursoDetalhe />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/alunos" element={
                 <ProtectedRoute requiresAdmin>
                   <AdminAlunos />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/configuracoes" element={
                 <ProtectedRoute requiresAdmin>
                   <AdminConfiguracoes />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/notificacoes" element={
                 <ProtectedRoute requiresAdmin>
                   <AdminNotificacoes />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/materiais" element={
                 <ProtectedRoute requiresAdmin>
-                  <AdminConfiguracoes />
+                  <AdminMateriais />
                 </ProtectedRoute>
               } />
-              
+
               <Route path="/admin/drip-content" element={
                 <ProtectedRoute requiresAdmin>
-                  <AdminConfiguracoes />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/admin/acessos" element={
-                <ProtectedRoute requiresAdmin>
-                  <AdminAlunos />
+                  <AdminDripContent />
                 </ProtectedRoute>
               } />
 
