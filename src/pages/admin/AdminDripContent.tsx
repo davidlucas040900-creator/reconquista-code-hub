@@ -49,6 +49,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+// Constante para valor "todos" - evita string vazia no Select
+const ALL_STUDENTS_VALUE = '__all__';
+
 export default function AdminDripContent() {
   // Hooks
   const {
@@ -64,7 +67,7 @@ export default function AdminDripContent() {
     isSchedulingModule,
     isSchedulingLesson,
   } = useAdminDripContent();
-  
+
   const { students } = useAdminStudents();
   const { data: courses } = useCourses();
 
@@ -86,27 +89,31 @@ export default function AdminDripContent() {
     name: string;
   }>({ open: false, type: 'module', id: '', name: '' });
 
-  // Filtros
-  const [filterStudent, setFilterStudent] = useState('');
-  const [filterCourse, setFilterCourse] = useState('');
+  // Filtros - usa valor especial ao invés de string vazia
+  const [filterStudent, setFilterStudent] = useState(ALL_STUDENTS_VALUE);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Dados derivados
-  const selectedCourse = courses?.find(c => c.id === selectedCourseId);
-  const selectedModule = selectedCourse?.course_modules?.find(m => m.id === selectedModuleId);
+  // Dados derivados com proteção contra valores vazios
+  const validStudents = useMemo(() => {
+    return (students || []).filter(s => s.id && s.id.trim() !== '');
+  }, [students]);
 
-  // Filtrar módulos do curso selecionado
+  const validCourses = useMemo(() => {
+    return (courses || []).filter(c => c.id && c.id.trim() !== '');
+  }, [courses]);
+
+  // Filtrar módulos do curso selecionado (com proteção)
   const availableModules = useMemo(() => {
-    if (!selectedCourseId || !courses) return [];
-    const course = courses.find(c => c.id === selectedCourseId);
-    return course?.course_modules || [];
-  }, [selectedCourseId, courses]);
+    if (!selectedCourseId || !validCourses.length) return [];
+    const course = validCourses.find(c => c.id === selectedCourseId);
+    return (course?.course_modules || []).filter(m => m.id && m.id.trim() !== '');
+  }, [selectedCourseId, validCourses]);
 
-  // Filtrar aulas do módulo selecionado
+  // Filtrar aulas do módulo selecionado (com proteção)
   const availableLessons = useMemo(() => {
-    if (!selectedModuleId || !availableModules) return [];
+    if (!selectedModuleId || !availableModules.length) return [];
     const module = availableModules.find(m => m.id === selectedModuleId);
-    return module?.course_lessons || [];
+    return (module?.course_lessons || []).filter(l => l.id && l.id.trim() !== '');
   }, [selectedModuleId, availableModules]);
 
   // Resetar formulário
@@ -152,10 +159,13 @@ export default function AdminDripContent() {
     setDeleteDialog({ open: false, type: 'module', id: '', name: '' });
   };
 
-  // Filtrar releases
+  // Filtrar releases - corrigido para usar valor especial
   const filteredModuleReleases = useMemo(() => {
     return moduleReleases.filter(r => {
-      if (filterStudent && r.user_id !== filterStudent) return false;
+      // Filtro de estudante - ignora se for "todos"
+      if (filterStudent !== ALL_STUDENTS_VALUE && r.user_id !== filterStudent) {
+        return false;
+      }
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchUser = r.user?.email?.toLowerCase().includes(search) ||
@@ -169,7 +179,10 @@ export default function AdminDripContent() {
 
   const filteredLessonReleases = useMemo(() => {
     return lessonReleases.filter(r => {
-      if (filterStudent && r.user_id !== filterStudent) return false;
+      // Filtro de estudante - ignora se for "todos"
+      if (filterStudent !== ALL_STUDENTS_VALUE && r.user_id !== filterStudent) {
+        return false;
+      }
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchUser = r.user?.email?.toLowerCase().includes(search) ||
@@ -309,8 +322,9 @@ export default function AdminDripContent() {
                   <SelectValue placeholder="Filtrar por aluno" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="">Todos os alunos</SelectItem>
-                  {students?.map((student) => (
+                  {/* ✅ CORREÇÃO: Usar valor especial ao invés de string vazia */}
+                  <SelectItem value={ALL_STUDENTS_VALUE}>Todos os alunos</SelectItem>
+                  {validStudents.map((student) => (
                     <SelectItem key={student.id} value={student.id}>
                       {student.full_name || student.email}
                     </SelectItem>
@@ -388,11 +402,11 @@ export default function AdminDripContent() {
                             </Badge>
                           )}
                         </div>
-                        
+
                         <h3 className="font-semibold text-white truncate">
                           {release.module?.name || 'Módulo'}
                         </h3>
-                        
+
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
                           <span>👤 {release.user?.full_name || release.user?.email}</span>
                           <span>
@@ -490,11 +504,11 @@ export default function AdminDripContent() {
                             AULA
                           </Badge>
                         </div>
-                        
+
                         <h3 className="font-semibold text-white truncate">
                           {release.lesson?.title || 'Aula'}
                         </h3>
-                        
+
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
                           <span>👤 {release.user?.full_name || release.user?.email}</span>
                           <span>
@@ -504,7 +518,7 @@ export default function AdminDripContent() {
                             }
                           </span>
                         </div>
-                        
+
                         {release.notes && (
                           <p className="mt-2 text-xs text-gray-500 italic">
                             📝 {release.notes}
@@ -596,11 +610,17 @@ export default function AdminDripContent() {
                   <SelectValue placeholder="Escolha um aluno" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  {students?.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.full_name || student.email}
-                    </SelectItem>
-                  ))}
+                  {validStudents.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">
+                      Nenhum aluno encontrado
+                    </div>
+                  ) : (
+                    validStudents.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.full_name || student.email}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -620,11 +640,17 @@ export default function AdminDripContent() {
                   <SelectValue placeholder="Escolha um curso" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  {courses?.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.name}
-                    </SelectItem>
-                  ))}
+                  {validCourses.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">
+                      Nenhum curso encontrado
+                    </div>
+                  ) : (
+                    validCourses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -644,11 +670,17 @@ export default function AdminDripContent() {
                   <SelectValue placeholder={selectedCourseId ? "Escolha um módulo" : "Selecione um curso primeiro"} />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  {availableModules.map((module) => (
-                    <SelectItem key={module.id} value={module.id}>
-                      {module.name}
-                    </SelectItem>
-                  ))}
+                  {availableModules.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-400">
+                      {selectedCourseId ? 'Nenhum módulo encontrado' : 'Selecione um curso primeiro'}
+                    </div>
+                  ) : (
+                    availableModules.map((module) => (
+                      <SelectItem key={module.id} value={module.id}>
+                        {module.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -666,11 +698,17 @@ export default function AdminDripContent() {
                     <SelectValue placeholder={selectedModuleId ? "Escolha uma aula" : "Selecione um módulo primeiro"} />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {availableLessons.map((lesson) => (
-                      <SelectItem key={lesson.id} value={lesson.id}>
-                        {lesson.title}
-                      </SelectItem>
-                    ))}
+                    {availableLessons.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-400">
+                        {selectedModuleId ? 'Nenhuma aula encontrada' : 'Selecione um módulo primeiro'}
+                      </div>
+                    ) : (
+                      availableLessons.map((lesson) => (
+                        <SelectItem key={lesson.id} value={lesson.id}>
+                          {lesson.title}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
