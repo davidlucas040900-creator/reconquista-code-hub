@@ -94,7 +94,7 @@ export default function AdminMateriais() {
           <div>
             <h1 className="text-3xl font-bold text-white">Materiais</h1>
             <p className="text-gray-400 mt-1">
-              Gerencie PDFs, áudios, imagens e vídeos
+              Gerencie PDFs, audios, imagens e videos
             </p>
           </div>
           <Button onClick={() => setShowUploadDialog(true)}>
@@ -140,11 +140,11 @@ export default function AdminMateriais() {
               )}
               {material.module && (
                 <div className="text-xs text-gray-500">
-                  <span className="text-gold">Módulo:</span> {material.module.name}
+                  <span className="text-gold">Modulo:</span> {material.module.name}
                 </div>
               )}
 
-              
+              <a
                 href={material.file_url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -165,7 +165,7 @@ export default function AdminMateriais() {
               Nenhum material enviado
             </h3>
             <p className="text-gray-400 mb-4">
-              Comece fazendo upload de PDFs, áudios ou imagens
+              Comece fazendo upload de PDFs, audios ou imagens
             </p>
             <Button onClick={() => setShowUploadDialog(true)}>
               <Upload className="w-4 h-4 mr-2" />
@@ -198,7 +198,7 @@ export default function AdminMateriais() {
             </div>
 
             <div>
-              <Label>Título *</Label>
+              <Label>Titulo *</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -208,11 +208,11 @@ export default function AdminMateriais() {
             </div>
 
             <div>
-              <Label>Descrição</Label>
+              <Label>Descricao</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descrição opcional..."
+                placeholder="Descricao opcional..."
                 className="bg-zinc-800 border-zinc-700 text-white"
               />
             </div>
@@ -235,10 +235,10 @@ export default function AdminMateriais() {
 
             {selectedCourse && selectedCourseData?.course_modules && (
               <div>
-                <Label>Módulo (opcional)</Label>
+                <Label>Modulo (opcional)</Label>
                 <Select value={selectedModule} onValueChange={setSelectedModule}>
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                    <SelectValue placeholder="Selecione um módulo" />
+                    <SelectValue placeholder="Selecione um modulo" />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700 text-white">
                     {selectedCourseData.course_modules.map((module) => (
